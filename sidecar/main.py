@@ -46,6 +46,7 @@ from routes.chat import router as chat_router
 from routes.studio import router as studio_router
 from routes.downloads import router as downloads_router
 from routes.research import router as research_router
+from routes.notes import router as notes_router
 app.include_router(auth_router)
 app.include_router(notebooks_router)
 app.include_router(sources_router)
@@ -53,6 +54,7 @@ app.include_router(chat_router)
 app.include_router(studio_router)
 app.include_router(downloads_router)
 app.include_router(research_router)
+app.include_router(notes_router)
 
 
 @app.get("/health")

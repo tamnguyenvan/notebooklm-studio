@@ -536,6 +536,45 @@ async fn import_many_research_results(
     .await
 }
 
+// ── Module 8: Notes ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn list_notes(notebook_id: String) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/notebooks/{}/notes", notebook_id)).await
+}
+
+#[tauri::command]
+async fn create_note(
+    notebook_id: String,
+    title: String,
+    content: String,
+) -> Result<serde_json::Value, String> {
+    sidecar_post(
+        &format!("/notebooks/{}/notes", notebook_id),
+        serde_json::json!({ "title": title, "content": content }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn update_note(
+    notebook_id: String,
+    note_id: String,
+    title: String,
+    content: String,
+) -> Result<serde_json::Value, String> {
+    sidecar_put(
+        &format!("/notebooks/{}/notes/{}", notebook_id, note_id),
+        serde_json::json!({ "title": title, "content": content }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn delete_note(notebook_id: String, note_id: String) -> Result<serde_json::Value, String> {
+    sidecar_delete(&format!("/notebooks/{}/notes/{}", notebook_id, note_id)).await
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -590,6 +629,10 @@ fn main() {
             get_research_results,
             import_research_result,
             import_many_research_results,
+            list_notes,
+            create_note,
+            update_note,
+            delete_note,
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

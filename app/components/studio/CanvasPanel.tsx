@@ -14,6 +14,7 @@ import { FlashcardViewer } from './viewers/FlashcardViewer'
 import { ReportViewer } from './viewers/ReportViewer'
 import { DataTableViewer } from './viewers/DataTableViewer'
 import { MindMapViewer } from './viewers/MindMapViewer'
+import { NoteEditor } from '../notes/NoteEditor'
 import { useToastStore } from '../../stores/toastStore'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { useDownloadStore } from '../../stores/downloadStore'
@@ -108,7 +109,9 @@ export function CanvasPanel() {
             style={{ borderColor: 'var(--color-separator)' }}
           >
             <span className="flex-1 text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-              {ARTIFACT_LABELS[canvasItem.artifactType]}
+              {'type' in canvasItem && canvasItem.type === 'note'
+                ? 'Note'
+                : ARTIFACT_LABELS[(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType]}
             </span>
             <button
               onClick={() => setExpanded((e) => !e)}
@@ -134,70 +137,77 @@ export function CanvasPanel() {
 
           {/* Viewer */}
           <div className="flex-1 overflow-hidden">
-            <ViewerSwitch
-              notebookId={canvasItem.notebookId}
-              artifactType={canvasItem.artifactType}
-            />
+            {'type' in canvasItem && canvasItem.type === 'note' ? (
+              <NoteEditor notebookId={canvasItem.notebookId} noteId={canvasItem.noteId} />
+            ) : (
+              <ViewerSwitch
+                notebookId={(canvasItem as { notebookId: string; artifactType: ArtifactType }).notebookId}
+                artifactType={(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType}
+              />
+            )}
           </div>
 
-          {/* Footer */}
-          <div
-            className="flex items-center justify-between px-3 py-2.5 border-t shrink-0"
-            style={{ borderColor: 'var(--color-separator)' }}
-          >
-            <div className="relative">
-              <button
-                onClick={() => {
-                  const formats = DOWNLOAD_FORMATS[canvasItem.artifactType]
-                  if (formats.length === 1) handleDownload(formats[0])
-                  else setShowFormats((s) => !s)
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-                style={{
-                  borderColor: 'var(--color-separator)',
-                  color: 'var(--color-text-primary)',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download
-                {DOWNLOAD_FORMATS[canvasItem.artifactType].length > 1 && ' ▾'}
-              </button>
+          {/* Footer — only show download for artifacts, not notes */}
+          {'type' in canvasItem && canvasItem.type === 'note' ? null : (
+            <div
+              className="flex items-center justify-between px-3 py-2.5 border-t shrink-0"
+              style={{ borderColor: 'var(--color-separator)' }}
+            >
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    const artifactCanvasItem = canvasItem as { notebookId: string; artifactType: ArtifactType }
+                    const formats = DOWNLOAD_FORMATS[artifactCanvasItem.artifactType]
+                    if (formats.length === 1) handleDownload(formats[0])
+                    else setShowFormats((s) => !s)
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                  style={{
+                    borderColor: 'var(--color-separator)',
+                    color: 'var(--color-text-primary)',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download
+                  {DOWNLOAD_FORMATS[(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType].length > 1 && ' ▾'}
+                </button>
 
-              {/* Format picker */}
-              <AnimatePresence>
-                {showFormats && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute bottom-full mb-1 left-0 rounded-lg border overflow-hidden z-50"
-                    style={{
-                      background: 'var(--color-elevated)',
-                      borderColor: 'var(--color-separator)',
-                      boxShadow: 'var(--shadow-lg)',
-                      minWidth: '120px',
-                    }}
-                  >
-                    {DOWNLOAD_FORMATS[canvasItem.artifactType].map((fmt) => (
-                      <button
-                        key={fmt.format}
-                        onClick={() => handleDownload(fmt)}
-                        className="flex w-full items-center px-3 py-2 text-xs transition-colors"
-                        style={{ color: 'var(--color-text-primary)' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        {fmt.label}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                {/* Format picker */}
+                <AnimatePresence>
+                  {showFormats && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute bottom-full mb-1 left-0 rounded-lg border overflow-hidden z-50"
+                      style={{
+                        background: 'var(--color-elevated)',
+                        borderColor: 'var(--color-separator)',
+                        boxShadow: 'var(--shadow-lg)',
+                        minWidth: '120px',
+                      }}
+                    >
+                      {DOWNLOAD_FORMATS[(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType].map((fmt) => (
+                        <button
+                          key={fmt.format}
+                          onClick={() => handleDownload(fmt)}
+                          className="flex w-full items-center px-3 py-2 text-xs transition-colors"
+                          style={{ color: 'var(--color-text-primary)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          {fmt.label}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

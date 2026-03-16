@@ -117,6 +117,16 @@ export interface ResearchState {
   summary: string
 }
 
+// ── Notes types ───────────────────────────────────────────────────────────────
+
+export interface Note {
+  id: string
+  title: string
+  content: string
+  created_at: string | null
+  updated_at: string | null
+}
+
 export const ipc = {
   // ── Module 1: Auth ──────────────────────────────────────────────────────
   getAuthStatus: () => invoke<AuthStatus>('get_auth_status'),
@@ -212,4 +222,14 @@ export const ipc = {
     invoke<Source>('import_research_result', { notebookId, resultUrl }),
   importManyResearchResults: (notebookId: string, sources: { url: string; title: string }[]) =>
     invoke<{ imported: Source[] }>('import_many_research_results', { notebookId, sources }),
+
+  // ── Module 8: Notes ─────────────────────────────────────────────────────
+  listNotes: (notebookId: string) =>
+    invoke<Note[]>('list_notes', { notebookId }),
+  createNote: (notebookId: string, title: string, content: string) =>
+    invoke<Note>('create_note', { notebookId, title, content }),
+  updateNote: (notebookId: string, noteId: string, title: string, content: string) =>
+    invoke<Note>('update_note', { notebookId, noteId, title, content }),
+  deleteNote: (notebookId: string, noteId: string) =>
+    invoke<{ status: string }>('delete_note', { notebookId, noteId }),
 }

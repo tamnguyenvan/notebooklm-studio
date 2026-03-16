@@ -16,7 +16,7 @@ interface ArtifactStore {
   // active generation tasks
   activeTasks: ActiveTask[]
   // canvas: which artifact is open
-  canvasItem: { notebookId: string; artifactType: ArtifactType } | null
+  canvasItem: { notebookId: string; artifactType: ArtifactType } | { notebookId: string; noteId: string; type: 'note' } | null
 
   fetchArtifacts: (notebookId: string) => Promise<void>
   generate: (notebookId: string, config: GenerateConfig) => Promise<string>
@@ -27,6 +27,7 @@ interface ArtifactStore {
   onTaskError: (taskId: string, notebookId: string, error: string) => void
   // Canvas
   openCanvas: (notebookId: string, artifactType: ArtifactType) => void
+  openNote: (notebookId: string, noteId: string) => void
   closeCanvas: () => void
 }
 
@@ -171,6 +172,10 @@ export const useArtifactStore = create<ArtifactStore>((set) => ({
 
   openCanvas: (notebookId, artifactType) => {
     set({ canvasItem: { notebookId, artifactType } })
+  },
+
+  openNote: (notebookId, noteId) => {
+    set({ canvasItem: { notebookId, noteId, type: 'note' } })
   },
 
   closeCanvas: () => set({ canvasItem: null }),

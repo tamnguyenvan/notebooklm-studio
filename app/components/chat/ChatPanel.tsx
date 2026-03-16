@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Send, Copy, Check, Settings, AlertCircle, BookOpen, ChevronDown,
+  Send, Copy, Check, Settings, AlertCircle, BookOpen, ChevronDown, StickyNote,
 } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
 import { useToastStore } from '../../stores/toastStore'
 import { useSourceStore } from '../../stores/sourceStore'
+import { useNotesStore } from '../../stores/notesStore'
+import { useArtifactStore } from '../../stores/artifactStore'
 import { ChatMessage, ChatReference } from '../../lib/ipc'
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
@@ -53,10 +55,12 @@ function MessageBubble({
   msg,
   sources,
   onFollowUp,
+  onSaveToNotes,
 }: {
   msg: ChatMessage
   sources: { id: string; title: string }[]
   onFollowUp: (text: string) => void
+  onSaveToNotes: (content: string) => void
 }) {
   const [copied, setCopied] = useState(false)
   const isUser = msg.role === 'user'
@@ -187,6 +191,16 @@ function MessageBubble({
           >
             {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
             {copied ? 'Copied' : 'Copy'}
+          </button>
+          <button
+            onClick={() => onSaveToNotes(msg.content)}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <StickyNote className="w-3 h-3" />
+            Save to Notes
           </button>
         </div>
 
@@ -324,6 +338,9 @@ function PersonaModal({ notebookId, onClose }: { notebookId: string; onClose: ()
 export function ChatPanel({ notebookId }: { notebookId: string }) {
   const { messages, loading, loadHistory, sendMessage } = useChatStore()
   const { sources } = useSourceStore()
+  const { prefillNote } = useNotesStore()
+  const { openNote } = useArtifactStore()
+  const { show: showToast } = useToastStore()
   const [input, setInput] = useState('')
   const [showPersona, setShowPersona] = useState(false)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
@@ -365,8 +382,17 @@ export function ChatPanel({ notebookId }: { notebookId: string }) {
     ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'
   }, [input])
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim()
+  const handleSaveToNotes = useCallback(async (content: string) => {
+    try {
+      const note = await prefillNote(notebookId, content)
+      openNote(notebookId, note.id)
+      showToast({ type: 'success', message: 'Saved to Notes' })
+    } catch (e) {
+      showToast({ type: 'error', message: `Failed to save: ${String(e)}` })
+    }
+  }, [notebookId, prefillNote, openNote, showToast])
+
+  const handleSend = useCallback(async () => {    const text = input.trim()
     if (!text || isLoading) return
     setInput('')
     await sendMessage(notebookId, text)
@@ -416,6 +442,7 @@ export function ChatPanel({ notebookId }: { notebookId: string }) {
                 setInput(text)
                 textareaRef.current?.focus()
               }}
+              onSaveToNotes={handleSaveToNotes}
             />
           ))}
         </AnimatePresence>
