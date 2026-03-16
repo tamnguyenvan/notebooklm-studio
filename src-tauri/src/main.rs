@@ -146,6 +146,95 @@ async fn logout() -> Result<serde_json::Value, String> {
     Ok(json)
 }
 
+// ── notebook commands ─────────────────────────────────────────────────────────
+
+async fn sidecar_get(path: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get(format!("{}{}", SIDECAR_URL, path))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        Ok(res.json().await.map_err(|e| e.to_string())?)
+    } else {
+        let err: serde_json::Value = res.json().await.unwrap_or(serde_json::json!({"error": "request_failed"}));
+        Err(err.to_string())
+    }
+}
+
+async fn sidecar_post(path: &str, body: serde_json::Value) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .post(format!("{}{}", SIDECAR_URL, path))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        Ok(res.json().await.map_err(|e| e.to_string())?)
+    } else {
+        let err: serde_json::Value = res.json().await.unwrap_or(serde_json::json!({"error": "request_failed"}));
+        Err(err.to_string())
+    }
+}
+
+async fn sidecar_put(path: &str, body: serde_json::Value) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .put(format!("{}{}", SIDECAR_URL, path))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        Ok(res.json().await.map_err(|e| e.to_string())?)
+    } else {
+        let err: serde_json::Value = res.json().await.unwrap_or(serde_json::json!({"error": "request_failed"}));
+        Err(err.to_string())
+    }
+}
+
+async fn sidecar_delete(path: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .delete(format!("{}{}", SIDECAR_URL, path))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        Ok(res.json().await.map_err(|e| e.to_string())?)
+    } else {
+        let err: serde_json::Value = res.json().await.unwrap_or(serde_json::json!({"error": "request_failed"}));
+        Err(err.to_string())
+    }
+}
+
+#[tauri::command]
+async fn list_notebooks() -> Result<serde_json::Value, String> {
+    sidecar_get("/notebooks").await
+}
+
+#[tauri::command]
+async fn create_notebook(title: String, emoji: Option<String>) -> Result<serde_json::Value, String> {
+    sidecar_post("/notebooks", serde_json::json!({ "title": title, "emoji": emoji })).await
+}
+
+#[tauri::command]
+async fn rename_notebook(id: String, title: String) -> Result<serde_json::Value, String> {
+    sidecar_put(&format!("/notebooks/{}/rename", id), serde_json::json!({ "title": title })).await
+}
+
+#[tauri::command]
+async fn delete_notebook(id: String) -> Result<serde_json::Value, String> {
+    sidecar_delete(&format!("/notebooks/{}", id)).await
+}
+
+#[tauri::command]
+async fn pin_notebook(id: String, pinned: bool) -> Result<serde_json::Value, String> {
+    sidecar_put(&format!("/notebooks/{}/pin", id), serde_json::json!({ "pinned": pinned })).await
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -166,6 +255,11 @@ fn main() {
             get_auth_status,
             login,
             logout,
+            list_notebooks,
+            create_notebook,
+            rename_notebook,
+            delete_notebook,
+            pin_notebook,
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")
