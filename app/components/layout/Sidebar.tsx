@@ -1,22 +1,18 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Settings, LogOut, Plus, BookOpen, Library } from 'lucide-react'
+import { Plus, BookOpen, Library } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAuthStore } from '../../stores/authStore'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { NewNotebookModal } from '../notebooks/NewNotebookModal'
 
 export function Sidebar({
   onLibraryOpen,
-  onSettingsOpen,
-  activeView,
+  onAllNotebooks,
 }: {
   onLibraryOpen: () => void
-  onSettingsOpen: () => void
-  activeView: string
+  onAllNotebooks: () => void
 }) {
-  const { account, logout } = useAuthStore()
   const { notebooks, activeNotebookId, setActiveNotebook, renameNotebook } = useNotebookStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -42,12 +38,6 @@ export function Sidebar({
     }
   }
 
-  const initials = account?.display_name
-    ? account.display_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : account?.email
-    ? account.email[0].toUpperCase()
-    : '?'
-
   return (
     <div
       className="flex h-full w-[240px] shrink-0 flex-col"
@@ -58,29 +48,6 @@ export function Sidebar({
         borderRight: '1px solid var(--color-separator)',
       }}
     >
-      {/* Account row */}
-      <div
-        className="flex items-center gap-2 px-4 py-3"
-        style={{ borderBottom: '1px solid var(--color-separator)' }}
-      >
-        <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-          style={{ background: 'var(--color-accent)' }}
-        >
-          {initials}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
-            {account?.display_name ?? account?.email ?? 'Account'}
-          </p>
-          {account?.display_name && (
-            <p className="truncate text-xs leading-tight" style={{ color: 'var(--color-text-secondary)' }}>
-              {account.email}
-            </p>
-          )}
-        </div>
-      </div>
-
       {/* Notebooks section */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 pb-1 pt-3">
@@ -205,15 +172,17 @@ export function Sidebar({
         className="flex flex-col gap-1 p-2"
         style={{ borderTop: '1px solid var(--color-separator)' }}
       >
-        <SidebarLink icon={<BookOpen size={15} />} label="All Notebooks" onClick={() => { setActiveNotebook(null); }} />
+        <SidebarLink icon={<BookOpen size={15} />} label="All Notebooks" onClick={onAllNotebooks} />
         <SidebarLink icon={<Library size={15} />} label="Downloads" onClick={onLibraryOpen} />
-        <SidebarLink
-          icon={<Settings size={15} />}
-          label="Settings"
-          onClick={onSettingsOpen}
-          active={activeView === 'settings'}
-        />
-        <SidebarLink icon={<LogOut size={15} />} label="Sign out" onClick={logout} danger />
+        {/* Primary: New Notebook */}
+        <button
+          onClick={() => setModalOpen(true)}
+          className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-85"
+          style={{ background: 'var(--color-accent)' }}
+        >
+          <Plus size={14} />
+          New Notebook
+        </button>
       </div>
 
       <NewNotebookModal open={modalOpen} onClose={() => setModalOpen(false)} />

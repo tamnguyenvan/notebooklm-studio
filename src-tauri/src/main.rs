@@ -17,6 +17,12 @@ fn toggle_fullscreen(window: tauri::Window) {
     }
 }
 
+#[tauri::command]
+fn open_url(app_handle: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_shell::ShellExt;
+    app_handle.shell().open(&url, None).map_err(|e| e.to_string())
+}
+
 // ── sidecar lifecycle ─────────────────────────────────────────────────────────
 
 fn spawn_and_monitor_sidecar(app_handle: tauri::AppHandle) -> Result<(), String> {
@@ -638,6 +644,7 @@ fn main() {
             start_sidecar,
             shutdown_sidecar,
             toggle_fullscreen,
+            open_url,
             get_auth_status,
             login,
             logout,

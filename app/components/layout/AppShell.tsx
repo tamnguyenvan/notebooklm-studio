@@ -24,6 +24,7 @@ export function AppShell() {
 
   const handleLibraryOpen = () => { setView('library'); setActiveNotebook(null) }
   const handleSettingsOpen = () => { setView('settings'); setActiveNotebook(null) }
+  const handleAllNotebooks = () => { setView('notebooks'); setActiveNotebook(null) }
 
   const renderMain = () => {
     if (view === 'library') return <LibraryScreen />
@@ -37,14 +38,10 @@ export function AppShell() {
       className="flex h-screen w-screen flex-col overflow-hidden"
       style={{ background: 'var(--color-app-bg)' }}
     >
-      <TitleBar />
+      <TitleBar onSettingsOpen={handleSettingsOpen} />
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          onLibraryOpen={handleLibraryOpen}
-          onSettingsOpen={handleSettingsOpen}
-          activeView={view}
-        />
+        <Sidebar onLibraryOpen={handleLibraryOpen} onAllNotebooks={handleAllNotebooks} />
 
         <main
           className="flex flex-1 flex-col overflow-hidden"

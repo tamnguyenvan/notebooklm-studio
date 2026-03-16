@@ -19,22 +19,12 @@ export function NotebookList() {
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div
-        className="flex shrink-0 items-center justify-between px-6 py-4"
+        className="flex shrink-0 items-center px-6 py-4"
         style={{ borderBottom: '1px solid var(--color-separator)' }}
       >
         <h1 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           All Notebooks
         </h1>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold text-white transition-colors"
-          style={{ background: 'var(--color-accent)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-hover)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
-        >
-          <Plus size={15} />
-          New Notebook
-        </button>
       </div>
 
       {/* Content */}
