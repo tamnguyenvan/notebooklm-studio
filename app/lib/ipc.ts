@@ -100,6 +100,23 @@ export interface DownloadRecord {
   file_exists: boolean
 }
 
+// ── Research types ────────────────────────────────────────────────────────────
+
+export interface ResearchResult {
+  url: string
+  title: string
+  domain: string
+  snippet: string
+}
+
+export interface ResearchState {
+  task_id: string | null
+  status: 'no_research' | 'completed'
+  query: string
+  sources: ResearchResult[]
+  summary: string
+}
+
 export const ipc = {
   // ── Module 1: Auth ──────────────────────────────────────────────────────
   getAuthStatus: () => invoke<AuthStatus>('get_auth_status'),
@@ -185,4 +202,14 @@ export const ipc = {
     invoke<{ status: string }>('delete_download', { downloadId, deleteFile }),
   revealDownload: (downloadId: string) =>
     invoke<{ status: string }>('reveal_download', { downloadId }),
+
+  // ── Module 7: Research ──────────────────────────────────────────────────
+  startResearch: (notebookId: string, query: string, mode: 'web' | 'drive', depth: 'fast' | 'deep') =>
+    invoke<{ task_id: string }>('start_research', { notebookId, query, mode, depth }),
+  getResearchResults: (notebookId: string) =>
+    invoke<ResearchState>('get_research_results', { notebookId }),
+  importResearchResult: (notebookId: string, resultUrl: string) =>
+    invoke<Source>('import_research_result', { notebookId, resultUrl }),
+  importManyResearchResults: (notebookId: string, sources: { url: string; title: string }[]) =>
+    invoke<{ imported: Source[] }>('import_many_research_results', { notebookId, sources }),
 }

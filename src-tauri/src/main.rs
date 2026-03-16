@@ -483,6 +483,59 @@ async fn open_save_dialog(
     Ok(path.map(|p| p.to_string()))
 }
 
+// ── research commands ─────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn start_research(
+    notebook_id: String,
+    query: String,
+    mode: String,
+    depth: String,
+) -> Result<serde_json::Value, String> {
+    sidecar_post(
+        &format!("/notebooks/{}/research", notebook_id),
+        serde_json::json!({ "query": query, "mode": mode, "depth": depth }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn get_research_results(notebook_id: String) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/notebooks/{}/research/results", notebook_id)).await
+}
+
+#[tauri::command]
+async fn import_research_result(
+    notebook_id: String,
+    result_url: String,
+) -> Result<serde_json::Value, String> {
+    // URL-encode the result_url so it's safe in the path segment
+    let encoded = result_url
+        .replace('/', "%2F")
+        .replace('?', "%3F")
+        .replace('&', "%26")
+        .replace('=', "%3D")
+        .replace('#', "%23")
+        .replace(':', "%3A");
+    sidecar_post(
+        &format!("/notebooks/{}/research/{}/import", notebook_id, encoded),
+        serde_json::json!({}),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn import_many_research_results(
+    notebook_id: String,
+    sources: Vec<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    sidecar_post(
+        &format!("/notebooks/{}/research/import-many", notebook_id),
+        serde_json::json!({ "sources": sources }),
+    )
+    .await
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -533,6 +586,10 @@ fn main() {
             record_download,
             delete_download,
             reveal_download,
+            start_research,
+            get_research_results,
+            import_research_result,
+            import_many_research_results,
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

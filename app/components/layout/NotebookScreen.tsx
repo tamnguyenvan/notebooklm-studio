@@ -9,6 +9,7 @@ import { ChatPanel } from '../chat/ChatPanel'
 import { StudioPanel } from '../studio/StudioPanel'
 import { CanvasPanel } from '../studio/CanvasPanel'
 import { BackgroundTaskBar } from '../studio/BackgroundTaskBar'
+import { ResearchPanel } from '../research/ResearchPanel'
 import { ws } from '../../lib/ws'
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
@@ -110,7 +111,7 @@ export function NotebookScreen({ notebookId }: Props) {
               {activeTab === 'chat'     && <ChatPanel notebookId={notebookId} />}
               {activeTab === 'sources'  && <SourcesPanel notebookId={notebookId} />}
               {activeTab === 'studio'   && <StudioPanel notebookId={notebookId} />}
-              {activeTab === 'research' && <PlaceholderTab label="Research" />}
+              {activeTab === 'research' && <ResearchPanel notebookId={notebookId} />}
               {activeTab === 'notes'    && <PlaceholderTab label="Notes" />}
             </motion.div>
           </AnimatePresence>
