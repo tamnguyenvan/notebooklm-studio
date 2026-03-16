@@ -294,6 +294,29 @@ async fn get_source_fulltext(notebook_id: String, source_id: String) -> Result<s
     sidecar_get(&format!("/notebooks/{}/sources/{}/fulltext", notebook_id, source_id)).await
 }
 
+// ── chat commands ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn send_message(notebook_id: String, message: String, conversation_id: Option<String>) -> Result<serde_json::Value, String> {
+    sidecar_post(
+        &format!("/notebooks/{}/chat", notebook_id),
+        serde_json::json!({ "message": message, "conversation_id": conversation_id }),
+    ).await
+}
+
+#[tauri::command]
+async fn get_chat_history(notebook_id: String) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/notebooks/{}/chat/history", notebook_id)).await
+}
+
+#[tauri::command]
+async fn set_persona(notebook_id: String, instructions: String) -> Result<serde_json::Value, String> {
+    sidecar_put(
+        &format!("/notebooks/{}/chat/persona", notebook_id),
+        serde_json::json!({ "instructions": instructions }),
+    ).await
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -330,6 +353,9 @@ fn main() {
             delete_source,
             get_source_fulltext,
             open_file_dialog,
+            send_message,
+            get_chat_history,
+            set_persona,
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

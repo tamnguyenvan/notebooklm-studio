@@ -39,6 +39,23 @@ export interface Source {
   created_at: string | null
 }
 
+export interface ChatReference {
+  source_id: string
+  citation_number: number | null
+  cited_text: string | null
+}
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  references: ChatReference[]
+  suggested_followups: string[]
+  // local-only fields (not from API)
+  pending?: boolean
+  error?: string
+}
+
 export const ipc = {
   // ── Module 1: Auth ──────────────────────────────────────────────────────
   getAuthStatus: () => invoke<AuthStatus>('get_auth_status'),
@@ -79,4 +96,14 @@ export const ipc = {
   // ── Utilities ───────────────────────────────────────────────────────────
   openFileDialog: () =>
     invoke<string | null>('open_file_dialog'),
+
+  // ── Module 4: Chat ──────────────────────────────────────────────────────
+  sendMessage: (notebookId: string, message: string, conversationId?: string) =>
+    invoke<{ answer: string; conversation_id: string; turn_number: number; references: ChatReference[]; suggested_followups: string[] }>(
+      'send_message', { notebookId, message, conversationId }
+    ),
+  getChatHistory: (notebookId: string) =>
+    invoke<ChatMessage[]>('get_chat_history', { notebookId }),
+  setPersona: (notebookId: string, instructions: string) =>
+    invoke<{ status: string }>('set_persona', { notebookId, instructions }),
 }

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, BookOpen, Wand2, Search, StickyNote, ChevronLeft } from 'lucide-react'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { SourcesPanel } from '../sources/SourcesPanel'
+import { ChatPanel } from '../chat/ChatPanel'
 import { ws } from '../../lib/ws'
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
@@ -35,7 +36,7 @@ interface Props {
 
 export function NotebookScreen({ notebookId }: Props) {
   const { notebooks, setActiveNotebook } = useNotebookStore()
-  const [activeTab, setActiveTab] = useState<TabId>('sources')
+  const [activeTab, setActiveTab] = useState<TabId>('chat')
   const nb = notebooks.find((n) => n.id === notebookId)
 
   // Connect WS once when notebook screen mounts
@@ -101,8 +102,8 @@ export function NotebookScreen({ notebookId }: Props) {
             transition={spring}
             className="h-full"
           >
+            {activeTab === 'chat'     && <ChatPanel notebookId={notebookId} />}
             {activeTab === 'sources'  && <SourcesPanel notebookId={notebookId} />}
-            {activeTab === 'chat'     && <PlaceholderTab label="Chat" />}
             {activeTab === 'studio'   && <PlaceholderTab label="Studio" />}
             {activeTab === 'research' && <PlaceholderTab label="Research" />}
             {activeTab === 'notes'    && <PlaceholderTab label="Notes" />}
