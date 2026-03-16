@@ -6,22 +6,30 @@ import { Sidebar } from './Sidebar'
 import { NotebookList } from '../notebooks/NotebookList'
 import { NotebookScreen } from './NotebookScreen'
 import { LibraryScreen } from '../library/LibraryScreen'
+import { SettingsScreen } from '../settings/SettingsScreen'
 import { DragOverlay } from '../sources/DragOverlay'
 import { ToastContainer } from '../ui/ToastContainer'
 import { useNotebookStore } from '../../stores/notebookStore'
 
+type View = 'notebooks' | 'library' | 'settings'
+
 export function AppShell() {
   const { activeNotebookId, setActiveNotebook } = useNotebookStore()
-  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [view, setView] = useState<View>('notebooks')
 
-  // Close library when a notebook is selected
+  // Close library/settings when a notebook is selected
   useEffect(() => {
-    if (activeNotebookId != null) setLibraryOpen(false)
+    if (activeNotebookId != null) setView('notebooks')
   }, [activeNotebookId])
 
-  const handleLibraryOpen = () => {
-    setLibraryOpen(true)
-    setActiveNotebook(null)
+  const handleLibraryOpen = () => { setView('library'); setActiveNotebook(null) }
+  const handleSettingsOpen = () => { setView('settings'); setActiveNotebook(null) }
+
+  const renderMain = () => {
+    if (view === 'library') return <LibraryScreen />
+    if (view === 'settings') return <SettingsScreen />
+    if (activeNotebookId != null) return <NotebookScreen notebookId={activeNotebookId} />
+    return <NotebookList />
   }
 
   return (
@@ -32,19 +40,17 @@ export function AppShell() {
       <TitleBar />
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar onLibraryOpen={handleLibraryOpen} />
+        <Sidebar
+          onLibraryOpen={handleLibraryOpen}
+          onSettingsOpen={handleSettingsOpen}
+          activeView={view}
+        />
 
         <main
           className="flex flex-1 flex-col overflow-hidden"
           style={{ background: 'var(--color-content-bg)' }}
         >
-          {libraryOpen ? (
-            <LibraryScreen />
-          ) : activeNotebookId == null ? (
-            <NotebookList />
-          ) : (
-            <NotebookScreen notebookId={activeNotebookId} />
-          )}
+          {renderMain()}
         </main>
       </div>
 

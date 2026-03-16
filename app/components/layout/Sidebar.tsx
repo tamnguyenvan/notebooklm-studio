@@ -7,7 +7,15 @@ import { useAuthStore } from '../../stores/authStore'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { NewNotebookModal } from '../notebooks/NewNotebookModal'
 
-export function Sidebar({ onLibraryOpen }: { onLibraryOpen: () => void }) {
+export function Sidebar({
+  onLibraryOpen,
+  onSettingsOpen,
+  activeView,
+}: {
+  onLibraryOpen: () => void
+  onSettingsOpen: () => void
+  activeView: string
+}) {
   const { account, logout } = useAuthStore()
   const { notebooks, activeNotebookId, setActiveNotebook, renameNotebook } = useNotebookStore()
   const [modalOpen, setModalOpen] = useState(false)
@@ -199,7 +207,12 @@ export function Sidebar({ onLibraryOpen }: { onLibraryOpen: () => void }) {
       >
         <SidebarLink icon={<BookOpen size={15} />} label="All Notebooks" onClick={() => { setActiveNotebook(null); }} />
         <SidebarLink icon={<Library size={15} />} label="Downloads" onClick={onLibraryOpen} />
-        <SidebarLink icon={<Settings size={15} />} label="Settings" onClick={() => {}} />
+        <SidebarLink
+          icon={<Settings size={15} />}
+          label="Settings"
+          onClick={onSettingsOpen}
+          active={activeView === 'settings'}
+        />
         <SidebarLink icon={<LogOut size={15} />} label="Sign out" onClick={logout} danger />
       </div>
 
@@ -209,25 +222,30 @@ export function Sidebar({ onLibraryOpen }: { onLibraryOpen: () => void }) {
 }
 
 function SidebarLink({
-  icon, label, onClick, danger,
+  icon, label, onClick, danger, active,
 }: {
   icon: React.ReactNode
   label: string
   onClick: () => void
   danger?: boolean
+  active?: boolean
 }) {
   return (
     <button
       onClick={onClick}
       className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors duration-100"
-      style={{ color: danger ? 'var(--color-error)' : 'var(--color-text-secondary)' }}
+      style={{
+        background: active ? 'var(--color-accent-subtle)' : 'transparent',
+        color: danger ? 'var(--color-error)' : active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+        fontWeight: active ? 600 : 400,
+      }}
       onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-        e.currentTarget.style.background = danger ? 'rgba(255,69,58,0.08)' : 'rgba(0,0,0,0.04)'
-        e.currentTarget.style.color = danger ? 'var(--color-error)' : 'var(--color-text-primary)'
+        if (!active) e.currentTarget.style.background = danger ? 'rgba(255,69,58,0.08)' : 'rgba(0,0,0,0.04)'
+        if (!active) e.currentTarget.style.color = danger ? 'var(--color-error)' : 'var(--color-text-primary)'
       }}
       onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-        e.currentTarget.style.background = 'transparent'
-        e.currentTarget.style.color = danger ? 'var(--color-error)' : 'var(--color-text-secondary)'
+        if (!active) e.currentTarget.style.background = 'transparent'
+        if (!active) e.currentTarget.style.color = danger ? 'var(--color-error)' : 'var(--color-text-secondary)'
       }}
     >
       {icon}
