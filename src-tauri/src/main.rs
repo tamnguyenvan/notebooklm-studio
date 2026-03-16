@@ -235,11 +235,71 @@ async fn pin_notebook(id: String, pinned: bool) -> Result<serde_json::Value, Str
     sidecar_put(&format!("/notebooks/{}/pin", id), serde_json::json!({ "pinned": pinned })).await
 }
 
+// ── source commands ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn open_file_dialog(window: tauri::Window) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let path = window
+        .app_handle()
+        .dialog()
+        .file()
+        .add_filter("Supported files", &["pdf", "txt", "md", "docx", "mp3", "mp4"])
+        .blocking_pick_file();
+    Ok(path.map(|p| p.to_string()))
+}
+
+#[tauri::command]
+async fn list_sources(notebook_id: String) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/notebooks/{}/sources", notebook_id)).await
+}
+
+#[tauri::command]
+async fn add_source_url(notebook_id: String, url: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/notebooks/{}/sources/url", notebook_id), serde_json::json!({ "url": url })).await
+}
+
+#[tauri::command]
+async fn add_source_youtube(notebook_id: String, url: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/notebooks/{}/sources/youtube", notebook_id), serde_json::json!({ "url": url })).await
+}
+
+#[tauri::command]
+async fn add_source_file(notebook_id: String, file_path: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/notebooks/{}/sources/file", notebook_id), serde_json::json!({ "file_path": file_path })).await
+}
+
+#[tauri::command]
+async fn add_source_text(notebook_id: String, title: String, text: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/notebooks/{}/sources/text", notebook_id), serde_json::json!({ "title": title, "content": text })).await
+}
+
+#[tauri::command]
+async fn add_source_gdrive(notebook_id: String, drive_url: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/notebooks/{}/sources/gdrive", notebook_id), serde_json::json!({ "drive_url": drive_url })).await
+}
+
+#[tauri::command]
+async fn refresh_source(notebook_id: String, source_id: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/notebooks/{}/sources/{}/refresh", notebook_id, source_id), serde_json::json!({})).await
+}
+
+#[tauri::command]
+async fn delete_source(notebook_id: String, source_id: String) -> Result<serde_json::Value, String> {
+    sidecar_delete(&format!("/notebooks/{}/sources/{}", notebook_id, source_id)).await
+}
+
+#[tauri::command]
+async fn get_source_fulltext(notebook_id: String, source_id: String) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/notebooks/{}/sources/{}/fulltext", notebook_id, source_id)).await
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             app.manage(Arc::new(Mutex::new(None::<CommandChild>)));
             let app_handle = app.handle().clone();
@@ -260,6 +320,16 @@ fn main() {
             rename_notebook,
             delete_notebook,
             pin_notebook,
+            list_sources,
+            add_source_url,
+            add_source_youtube,
+            add_source_file,
+            add_source_text,
+            add_source_gdrive,
+            refresh_source,
+            delete_source,
+            get_source_fulltext,
+            open_file_dialog,
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

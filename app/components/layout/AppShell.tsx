@@ -3,6 +3,8 @@
 import { TitleBar } from './TitleBar'
 import { Sidebar } from './Sidebar'
 import { NotebookList } from '../notebooks/NotebookList'
+import { NotebookScreen } from './NotebookScreen'
+import { DragOverlay } from '../sources/DragOverlay'
 import { ToastContainer } from '../ui/ToastContainer'
 import { useNotebookStore } from '../../stores/notebookStore'
 
@@ -26,37 +28,13 @@ export function AppShell() {
           {activeNotebookId == null ? (
             <NotebookList />
           ) : (
-            // Placeholder — replaced in Module 3+ with the notebook screen
-            <NotebookPlaceholder id={activeNotebookId} />
+            <NotebookScreen notebookId={activeNotebookId} />
           )}
         </main>
       </div>
 
+      <DragOverlay notebookId={activeNotebookId} />
       <ToastContainer />
-    </div>
-  )
-}
-
-function NotebookPlaceholder({ id }: { id: string }) {
-  const { notebooks, setActiveNotebook } = useNotebookStore()
-  const nb = notebooks.find((n) => n.id === id)
-
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <span className="text-5xl">{nb?.emoji ?? '📓'}</span>
-      <h2 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-        {nb?.title ?? 'Notebook'}
-      </h2>
-      <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-        Sources, Chat, Studio and more coming in the next modules.
-      </p>
-      <button
-        onClick={() => setActiveNotebook(null)}
-        className="mt-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors"
-        style={{ color: 'var(--color-accent)', background: 'var(--color-accent-subtle)' }}
-      >
-        ← Back to notebooks
-      </button>
     </div>
   )
 }

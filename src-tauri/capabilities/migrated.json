@@ -30,6 +30,7 @@
       ]
     },
     "shell:default",
-    "http:default"
+    "http:default",
+    "dialog:default"
   ]
 }
