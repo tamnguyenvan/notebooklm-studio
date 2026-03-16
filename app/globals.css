@@ -2,26 +2,107 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design Tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* Surfaces */
+  --color-app-bg:        #F5F5F7;
+  --color-content-bg:    #FFFFFF;
+  --color-sidebar-bg:    rgba(255, 255, 255, 0.72);
+  --color-elevated:      #FFFFFF;
+  --color-separator:     rgba(0, 0, 0, 0.08);
+
+  /* Text */
+  --color-text-primary:    #1D1D1F;
+  --color-text-secondary:  #6E6E73;
+  --color-text-tertiary:   #AEAEB2;
+  --color-text-placeholder:#C7C7CC;
+
+  /* Accent */
+  --color-accent:          #007AFF;
+  --color-accent-hover:    #0071E3;
+  --color-accent-pressed:  #0064D2;
+  --color-accent-subtle:   rgba(0, 122, 255, 0.10);
+
+  /* Semantic */
+  --color-success:  #30D158;
+  --color-warning:  #FF9F0A;
+  --color-error:    #FF453A;
+  --color-info:     #64D2FF;
+
+  /* Status dots */
+  --color-status-ready:    #30D158;
+  --color-status-indexing: #FF9F0A;
+  --color-status-error:    #FF453A;
+
+  /* Radius */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   20px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px  3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08);
+  --shadow-xl: 0 20px 48px rgba(0,0,0,0.16), 0 8px 16px rgba(0,0,0,0.10);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+html[data-theme="dark"] {
+  --color-app-bg:       #1C1C1E;
+  --color-content-bg:   #2C2C2E;
+  --color-sidebar-bg:   rgba(44, 44, 46, 0.80);
+  --color-elevated:     #3A3A3C;
+  --color-separator:    rgba(255, 255, 255, 0.08);
+  --color-text-primary:   #F5F5F7;
+  --color-text-secondary: #AEAEB2;
+  --color-text-tertiary:  #6E6E73;
+  --color-accent:         #0A84FF;
+  --color-accent-hover:   #409CFF;
+  --color-accent-subtle:  rgba(10, 132, 255, 0.15);
+  --shadow-sm: 0 1px  3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.12);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.20), 0 2px 4px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.24), 0 4px 8px rgba(0,0,0,0.16);
+  --shadow-xl: 0 20px 48px rgba(0,0,0,0.32), 0 8px 16px rgba(0,0,0,0.20);
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  background-color: var(--color-app-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent text selection on drag regions */
+  user-select: none;
+}
+
+/* Allow text selection inside content areas */
+p, span, input, textarea, [data-selectable] {
+  user-select: text;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-separator);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
 }

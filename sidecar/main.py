@@ -3,122 +3,106 @@ import signal
 import sys
 import asyncio
 import threading
-from typing import TypedDict
-from fastapi import FastAPI, Body
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from inference import infer_text_api
 from uvicorn import Config, Server
 
 PORT_API = 8008
+server_instance = None
 
-server_instance = None  # Global reference to the Uvicorn server instance
 
-app = FastAPI(
-    title="API server",
-    version="0.1.0",
-)
+# ── lifespan ─────────────────────────────────────────────────────────────────
 
-# Configure CORS settings
-origins = [
-    "*",  # to whitelist any url, REMOVE THIS FOR PRODUCTION!!!
-    # "http://localhost:3000", # for dev
-    # "https://your-web-ui.com", # for prod
-]
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: try to init client from existing storage_state.json
+    from services.client import init_client
+    await init_client()
+    yield
+    # Shutdown: close client
+    from services.client import clear_client
+    await clear_client()
+
+
+# ── app ───────────────────────────────────────────────────────────────────────
+
+app = FastAPI(title="NotebookLM Studio API", version="1.0.0", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    # allow_credentials=True,
+    allow_origins=["*"],  # tighten to tauri://localhost for production
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ── routes ────────────────────────────────────────────────────────────────────
 
-# Tell client we are ready to accept requests.
-# This is a mock func, modify to your needs.
-@app.get("/v1/connect")
-def connect_to_api_server():
-    print("[server] Connecting to server...", flush=True)
-    host = f"http://localhost:{PORT_API}"
-    return {
-        "message": f"Connected to api server on port {PORT_API}. Refer to '{host}/docs' for api docs.",
-        "data": {
-            "port": PORT_API,
-            "pid": os.getpid(),
-            "host": host,
-        },
-    }
+from routes.auth import router as auth_router
+app.include_router(auth_router)
 
 
-class T_Query(TypedDict):
-    prompt: str
+@app.get("/health")
+def health():
+    return {"status": "ok", "port": PORT_API, "pid": os.getpid()}
 
 
-# Mock text inference endpoint, here for inspiration.
-@app.post("/v1/completions")
-def llm_completion(payload: T_Query = Body(...)):
-    return infer_text_api.completions(payload)
-
-
-# Programmatically force shutdown this sidecar.
-def kill_process():
-    os.kill(os.getpid(), signal.SIGINT)  # This force closes this script.
-
-
-# Programmatically startup the api server
-def start_api_server(**kwargs):
-    global server_instance
-    port = kwargs.get("port", PORT_API)
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    from services.ws_manager import ws_manager
+    await ws_manager.connect(ws)
     try:
-        if server_instance is None:
-            print("[sidecar] Starting API server...", flush=True)
-            config = Config(app, host="0.0.0.0", port=port, log_level="info")
-            server_instance = Server(config)
-            # Start the ASGI server
-            asyncio.run(server_instance.serve())
-        else:
-            print(
-                "[sidecar] Failed to start new server. Server instance already running.",
-                flush=True,
-            )
-    except Exception as e:
-        print(f"[sidecar] Error, failed to start API server {e}", flush=True)
+        while True:
+            # Heartbeat: echo pings back
+            data = await ws.receive_text()
+            if data == "ping":
+                await ws.send_text("pong")
+    except WebSocketDisconnect:
+        ws_manager.disconnect(ws)
+    except Exception:
+        ws_manager.disconnect(ws)
 
 
-# Handle the stdin event loop. This can be used like a CLI.
+# ── process management ────────────────────────────────────────────────────────
+
+def kill_process():
+    os.kill(os.getpid(), signal.SIGINT)
+
+
 def stdin_loop():
     print("[sidecar] Waiting for commands...", flush=True)
     while True:
-        # Read input from stdin.
         user_input = sys.stdin.readline().strip()
-
-        # Check if the input matches one of the available functions
         match user_input:
             case "sidecar shutdown":
                 print("[sidecar] Received 'sidecar shutdown' command.", flush=True)
                 kill_process()
             case _:
-                print(
-                    f"[sidecar] Invalid command [{user_input}]. Try again.", flush=True
-                )
+                if user_input:
+                    print(f"[sidecar] Unknown command: [{user_input}]", flush=True)
 
 
-# Start the input loop in a separate thread
 def start_input_thread():
     try:
-        input_thread = threading.Thread(target=stdin_loop)
-        input_thread.daemon = True  # so it exits when the main program exits
-        input_thread.start()
-    except:
+        t = threading.Thread(target=stdin_loop, daemon=True)
+        t.start()
+    except Exception:
         print("[sidecar] Failed to start input handler.", flush=True)
 
 
+def start_api_server(**kwargs):
+    global server_instance
+    port = kwargs.get("port", PORT_API)
+    if server_instance is not None:
+        print("[sidecar] Server already running.", flush=True)
+        return
+    print(f"[sidecar] Starting API server on port {port}...", flush=True)
+    config = Config(app, host="127.0.0.1", port=port, log_level="info")
+    server_instance = Server(config)
+    asyncio.run(server_instance.serve())
+
+
 if __name__ == "__main__":
-    # You can spawn sub-processes here before the main process.
-    # new_command = ["python", "-m", "some_script", "--arg", "argValue"]
-    # subprocess.Popen(new_command)
-
-    # Listen for stdin from parent process
     start_input_thread()
-
-    # Starts API server, blocks further code from execution.
     start_api_server()

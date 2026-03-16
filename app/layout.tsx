@@ -1,11 +1,9 @@
+import type { Metadata } from 'next'
 import './globals.css'
-import { Inter } from 'next/font/google'
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata = {
-  title: 'Example Tauri v2 Python sidecar',
-  description: 'Template for tauri and python sidecar project.',
+export const metadata: Metadata = {
+  title: 'NotebookLM Studio',
+  description: 'Desktop client for Google NotebookLM',
 }
 
 export default function RootLayout({
@@ -15,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body>{children}</body>
     </html>
   )
 }
