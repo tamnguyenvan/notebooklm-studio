@@ -127,6 +127,21 @@ export interface Note {
   updated_at: string | null
 }
 
+// ── Sharing types ─────────────────────────────────────────────────────────────
+
+export type SharePermission = 'viewer' | 'editor' | 'owner'
+
+export interface SharedUser {
+  email: string
+  permission: SharePermission
+}
+
+export interface ShareStatus {
+  is_public: boolean
+  share_url: string | null
+  shared_users: SharedUser[]
+}
+
 export const ipc = {
   // ── Module 1: Auth ──────────────────────────────────────────────────────
   getAuthStatus: () => invoke<AuthStatus>('get_auth_status'),
@@ -232,4 +247,14 @@ export const ipc = {
     invoke<Note>('update_note', { notebookId, noteId, title, content }),
   deleteNote: (notebookId: string, noteId: string) =>
     invoke<{ status: string }>('delete_note', { notebookId, noteId }),
+
+  // ── Module 9: Sharing ───────────────────────────────────────────────────
+  getSharingStatus: (notebookId: string) =>
+    invoke<ShareStatus>('get_sharing_status', { notebookId }),
+  setSharingPublic: (notebookId: string, public_: boolean) =>
+    invoke<ShareStatus>('set_sharing_public', { notebookId, public: public_ }),
+  addSharingUser: (notebookId: string, email: string, permission: SharePermission, notify: boolean, welcomeMessage: string) =>
+    invoke<ShareStatus>('add_sharing_user', { notebookId, email, permission, notify, welcomeMessage }),
+  removeSharingUser: (notebookId: string, email: string) =>
+    invoke<ShareStatus>('remove_sharing_user', { notebookId, email }),
 }

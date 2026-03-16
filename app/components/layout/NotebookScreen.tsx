@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MessageSquare, BookOpen, Wand2, Search, StickyNote, ChevronLeft } from 'lucide-react'
+import { MessageSquare, BookOpen, Wand2, Search, StickyNote, ChevronLeft, Share2 } from 'lucide-react'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { SourcesPanel } from '../sources/SourcesPanel'
 import { ChatPanel } from '../chat/ChatPanel'
@@ -11,6 +11,7 @@ import { CanvasPanel } from '../studio/CanvasPanel'
 import { BackgroundTaskBar } from '../studio/BackgroundTaskBar'
 import { ResearchPanel } from '../research/ResearchPanel'
 import { NotesPanel } from '../notes/NotesPanel'
+import { ShareModal } from '../sharing/ShareModal'
 import { ws } from '../../lib/ws'
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
@@ -42,6 +43,7 @@ interface Props {
 export function NotebookScreen({ notebookId }: Props) {
   const { notebooks, setActiveNotebook } = useNotebookStore()
   const [activeTab, setActiveTab] = useState<TabId>('chat')
+  const [shareOpen, setShareOpen] = useState(false)
   const nb = notebooks.find((n) => n.id === notebookId)
 
   // Connect WS once when notebook screen mounts
@@ -68,11 +70,21 @@ export function NotebookScreen({ notebookId }: Props) {
         </button>
         <span className="text-xl">{nb?.emoji ?? '📓'}</span>
         <h1
-          className="text-base font-semibold truncate"
+          className="text-base font-semibold truncate flex-1"
           style={{ color: 'var(--color-text-primary)' }}
         >
           {nb?.title ?? 'Notebook'}
         </h1>
+        <button
+          onClick={() => setShareOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+          style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-separator)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          Share
+        </button>
       </div>
 
       {/* Tab bar */}
@@ -124,6 +136,17 @@ export function NotebookScreen({ notebookId }: Props) {
 
       {/* Background task bar */}
       <BackgroundTaskBar />
+
+      {/* Share modal */}
+      <AnimatePresence>
+        {shareOpen && nb && (
+          <ShareModal
+            notebookId={notebookId}
+            notebookTitle={nb.title}
+            onClose={() => setShareOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

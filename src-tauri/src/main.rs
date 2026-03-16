@@ -575,6 +575,51 @@ async fn delete_note(notebook_id: String, note_id: String) -> Result<serde_json:
     sidecar_delete(&format!("/notebooks/{}/notes/{}", notebook_id, note_id)).await
 }
 
+// ── Module 9: Sharing ─────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_sharing_status(notebook_id: String) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/notebooks/{}/sharing", notebook_id)).await
+}
+
+#[tauri::command]
+async fn set_sharing_public(notebook_id: String, public: bool) -> Result<serde_json::Value, String> {
+    sidecar_post(
+        &format!("/notebooks/{}/sharing/public", notebook_id),
+        serde_json::json!({ "public": public }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn add_sharing_user(
+    notebook_id: String,
+    email: String,
+    permission: String,
+    notify: bool,
+    welcome_message: String,
+) -> Result<serde_json::Value, String> {
+    sidecar_post(
+        &format!("/notebooks/{}/sharing/users", notebook_id),
+        serde_json::json!({
+            "email": email,
+            "permission": permission,
+            "notify": notify,
+            "welcome_message": welcome_message,
+        }),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn remove_sharing_user(
+    notebook_id: String,
+    email: String,
+) -> Result<serde_json::Value, String> {
+    let encoded = email.replace('@', "%40").replace('.', "%2E");
+    sidecar_delete(&format!("/notebooks/{}/sharing/users/{}", notebook_id, encoded)).await
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -633,6 +678,10 @@ fn main() {
             create_note,
             update_note,
             delete_note,
+            get_sharing_status,
+            set_sharing_public,
+            add_sharing_user,
+            remove_sharing_user,
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { MoreHorizontal, Pin, PinOff, Trash2, Pencil } from 'lucide-react'
+import { MoreHorizontal, Pin, PinOff, Trash2, Pencil, Share2 } from 'lucide-react'
 import { Notebook } from '../../lib/ipc'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { useToastStore } from '../../stores/toastStore'
+import { ShareModal } from '../sharing/ShareModal'
 
 function timeAgo(iso: string | null): string {
   if (!iso) return ''
@@ -32,6 +33,7 @@ export function NotebookCard({ notebook, onClick }: Props) {
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(notebook.title)
   const [hovered, setHovered] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const renameRef = useRef<HTMLInputElement>(null)
 
@@ -88,6 +90,7 @@ export function NotebookCard({ notebook, onClick }: Props) {
   }
 
   return (
+    <>
     <motion.div
       whileHover={{ scale: 1.02 }}
       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
@@ -186,6 +189,8 @@ export function NotebookCard({ notebook, onClick }: Props) {
               >
                 <MenuItem icon={<Pencil size={13} />} label="Rename" onClick={() => { setMenuOpen(false); setRenaming(true) }} />
                 <div style={{ height: 1, background: 'var(--color-separator)', margin: '4px 0' }} />
+                <MenuItem icon={<Share2 size={13} />} label="Share" onClick={() => { setMenuOpen(false); setShareOpen(true) }} />
+                <div style={{ height: 1, background: 'var(--color-separator)', margin: '4px 0' }} />
                 <MenuItem
                   icon={notebook.is_pinned ? <PinOff size={13} /> : <Pin size={13} />}
                   label={notebook.is_pinned ? 'Unpin' : 'Pin'}
@@ -199,6 +204,14 @@ export function NotebookCard({ notebook, onClick }: Props) {
         </div>
       )}
     </motion.div>
+    {shareOpen && (
+      <ShareModal
+        notebookId={notebook.id}
+        notebookTitle={notebook.title}
+        onClose={() => setShareOpen(false)}
+      />
+    )}
+    </>
   )
 }
 
