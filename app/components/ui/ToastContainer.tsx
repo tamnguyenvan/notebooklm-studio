@@ -46,7 +46,7 @@ export function ToastContainer() {
           >
             <span style={{ color: COLORS[toast.type] }}>{ICONS[toast.type]}</span>
             <span className="flex-1">{toast.message}</span>
-            {toast.type === 'undo' && toast.onUndo && (
+            {toast.onUndo && (
               <button
                 onClick={() => { toast.onUndo!(); dismiss(toast.id) }}
                 className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors"

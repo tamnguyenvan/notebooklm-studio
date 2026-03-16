@@ -1,13 +1,13 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Settings, LogOut, Plus, BookOpen } from 'lucide-react'
+import { Settings, LogOut, Plus, BookOpen, Library } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '../../stores/authStore'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { NewNotebookModal } from '../notebooks/NewNotebookModal'
 
-export function Sidebar() {
+export function Sidebar({ onLibraryOpen }: { onLibraryOpen: () => void }) {
   const { account, logout } = useAuthStore()
   const { notebooks, activeNotebookId, setActiveNotebook, renameNotebook } = useNotebookStore()
   const [modalOpen, setModalOpen] = useState(false)
@@ -197,7 +197,8 @@ export function Sidebar() {
         className="flex flex-col gap-1 p-2"
         style={{ borderTop: '1px solid var(--color-separator)' }}
       >
-        <SidebarLink icon={<BookOpen size={15} />} label="All Notebooks" onClick={() => setActiveNotebook(null)} />
+        <SidebarLink icon={<BookOpen size={15} />} label="All Notebooks" onClick={() => { setActiveNotebook(null); }} />
+        <SidebarLink icon={<Library size={15} />} label="Downloads" onClick={onLibraryOpen} />
         <SidebarLink icon={<Settings size={15} />} label="Settings" onClick={() => {}} />
         <SidebarLink icon={<LogOut size={15} />} label="Sign out" onClick={logout} danger />
       </div>

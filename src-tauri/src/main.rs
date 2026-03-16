@@ -317,6 +317,172 @@ async fn set_persona(notebook_id: String, instructions: String) -> Result<serde_
     ).await
 }
 
+// ── studio commands ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn list_artifacts(notebook_id: String) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/notebooks/{}/artifacts", notebook_id)).await
+}
+
+#[tauri::command]
+async fn generate_artifact(
+    notebook_id: String,
+    config: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    // config arrives as the full GenerateConfig object: {type, ...options}
+    // The sidecar expects: {type: string, config: {options...}}
+    let artifact_type = config.get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let mut inner = config.clone();
+    if let Some(obj) = inner.as_object_mut() {
+        obj.remove("type");
+    }
+    let body = serde_json::json!({
+        "type": artifact_type,
+        "config": inner,
+    });
+    sidecar_post(
+        &format!("/notebooks/{}/generate", notebook_id),
+        body,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cancel_task(task_id: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/tasks/{}/cancel", task_id), serde_json::json!({})).await
+}
+
+#[tauri::command]
+async fn get_artifact_data(
+    notebook_id: String,
+    artifact_type: String,
+) -> Result<serde_json::Value, String> {
+    sidecar_get(&format!("/artifacts/data/{}/{}", notebook_id, artifact_type)).await
+}
+
+/// Stream artifact binary → returns a data URL for the frontend to use
+#[tauri::command]
+async fn get_artifact_stream_url(
+    notebook_id: String,
+    artifact_type: String,
+) -> Result<String, String> {
+    Ok(format!(
+        "http://127.0.0.1:8008/artifacts/stream/{}/{}",
+        notebook_id, artifact_type
+    ))
+}
+
+// ── download / library commands ───────────────────────────────────────────────
+
+#[tauri::command]
+async fn list_downloads(
+    artifact_type: Option<String>,
+    notebook_id: Option<String>,
+    search: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let mut url = format!("{}/downloads?", SIDECAR_URL);
+    if let Some(t) = artifact_type { url.push_str(&format!("artifact_type={}&", t)); }
+    if let Some(n) = notebook_id  { url.push_str(&format!("notebook_id={}&", n)); }
+    if let Some(s) = search       { url.push_str(&format!("search={}&", s)); }
+    let client = reqwest::Client::new();
+    let res = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        Ok(res.json().await.map_err(|e| e.to_string())?)
+    } else {
+        let err: serde_json::Value = res.json().await.unwrap_or(serde_json::json!({"error":"request_failed"}));
+        Err(err.to_string())
+    }
+}
+
+#[tauri::command]
+async fn record_download(
+    notebook_id: String,
+    notebook_title: String,
+    artifact_type: String,
+    format: String,
+    local_path: String,
+) -> Result<serde_json::Value, String> {
+    sidecar_post("/downloads/record", serde_json::json!({
+        "notebook_id": notebook_id,
+        "notebook_title": notebook_title,
+        "artifact_type": artifact_type,
+        "format": format,
+        "local_path": local_path,
+    })).await
+}
+
+#[tauri::command]
+async fn delete_download(download_id: String, delete_file: bool) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .delete(format!("{}/downloads/{}?delete_file={}", SIDECAR_URL, download_id, delete_file))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if res.status().is_success() {
+        Ok(res.json().await.map_err(|e| e.to_string())?)
+    } else {
+        let err: serde_json::Value = res.json().await.unwrap_or(serde_json::json!({"error":"request_failed"}));
+        Err(err.to_string())
+    }
+}
+
+#[tauri::command]
+async fn reveal_download(download_id: String) -> Result<serde_json::Value, String> {
+    sidecar_post(&format!("/downloads/{}/reveal", download_id), serde_json::json!({})).await
+}
+
+/// Download artifact to a user-chosen path AND record it in the library DB
+#[tauri::command]
+async fn download_artifact(
+    notebook_id: String,
+    artifact_type: String,
+    dest_path: String,
+    format: Option<String>,
+) -> Result<String, String> {
+    let fmt = format.unwrap_or_else(|| "default".to_string());
+    let url = format!(
+        "http://127.0.0.1:8008/artifacts/download/{}/{}?format={}",
+        notebook_id, artifact_type, fmt
+    );
+    let client = reqwest::Client::new();
+    let res = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("Download failed: HTTP {}", res.status()));
+    }
+    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
+    std::fs::write(&dest_path, &bytes).map_err(|e| e.to_string())?;
+    Ok(dest_path)
+}
+
+#[tauri::command]
+async fn open_save_dialog(
+    window: tauri::Window,
+    filename: String,
+    filters: Vec<serde_json::Value>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = window.app_handle().dialog().file().set_file_name(&filename);
+    for f in &filters {
+        if let (Some(name), Some(exts)) = (
+            f.get("name").and_then(|v| v.as_str()),
+            f.get("extensions").and_then(|v| v.as_array()),
+        ) {
+            let ext_strs: Vec<&str> = exts.iter().filter_map(|e| e.as_str()).collect();
+            builder = builder.add_filter(name, &ext_strs);
+        }
+    }
+    let path = builder.blocking_save_file();
+    Ok(path.map(|p| p.to_string()))
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -356,6 +522,17 @@ fn main() {
             send_message,
             get_chat_history,
             set_persona,
+            list_artifacts,
+            generate_artifact,
+            cancel_task,
+            get_artifact_data,
+            get_artifact_stream_url,
+            download_artifact,
+            open_save_dialog,
+            list_downloads,
+            record_download,
+            delete_download,
+            reveal_download,
         ])
         .build(tauri::generate_context!())
         .expect("Error while running tauri application")

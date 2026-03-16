@@ -6,6 +6,9 @@ import { MessageSquare, BookOpen, Wand2, Search, StickyNote, ChevronLeft } from 
 import { useNotebookStore } from '../../stores/notebookStore'
 import { SourcesPanel } from '../sources/SourcesPanel'
 import { ChatPanel } from '../chat/ChatPanel'
+import { StudioPanel } from '../studio/StudioPanel'
+import { CanvasPanel } from '../studio/CanvasPanel'
+import { BackgroundTaskBar } from '../studio/BackgroundTaskBar'
 import { ws } from '../../lib/ws'
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
@@ -91,25 +94,34 @@ export function NotebookScreen({ notebookId }: Props) {
         ))}
       </div>
 
-      {/* Tab content */}
-      <div className="flex-1 overflow-hidden">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={spring}
-            className="h-full"
-          >
-            {activeTab === 'chat'     && <ChatPanel notebookId={notebookId} />}
-            {activeTab === 'sources'  && <SourcesPanel notebookId={notebookId} />}
-            {activeTab === 'studio'   && <PlaceholderTab label="Studio" />}
-            {activeTab === 'research' && <PlaceholderTab label="Research" />}
-            {activeTab === 'notes'    && <PlaceholderTab label="Notes" />}
-          </motion.div>
-        </AnimatePresence>
+      {/* Main area: tab content + canvas panel side by side */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Tab content */}
+        <div className="flex-1 overflow-hidden">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={spring}
+              className="h-full"
+            >
+              {activeTab === 'chat'     && <ChatPanel notebookId={notebookId} />}
+              {activeTab === 'sources'  && <SourcesPanel notebookId={notebookId} />}
+              {activeTab === 'studio'   && <StudioPanel notebookId={notebookId} />}
+              {activeTab === 'research' && <PlaceholderTab label="Research" />}
+              {activeTab === 'notes'    && <PlaceholderTab label="Notes" />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Canvas panel */}
+        <CanvasPanel />
       </div>
+
+      {/* Background task bar */}
+      <BackgroundTaskBar />
     </div>
   )
 }
