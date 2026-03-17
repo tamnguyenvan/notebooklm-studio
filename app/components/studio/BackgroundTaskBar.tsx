@@ -20,15 +20,17 @@ const TYPE_LABELS: Record<string, string> = {
   report: 'Report', data_table: 'Data Table', mind_map: 'Mind Map',
 }
 
-export function BackgroundTaskBar() {
+export function BackgroundTaskBar({ notebookId }: { notebookId: string }) {
   const { activeTasks, cancelTask } = useArtifactStore()
   const { show } = useToastStore()
   const [expanded, setExpanded] = useState(false)
 
-  if (activeTasks.length === 0) return null
+  const tasks = activeTasks.filter((t) => t.notebookId === notebookId)
+
+  if (tasks.length === 0) return null
 
   const avgProgress = Math.round(
-    activeTasks.reduce((sum, t) => sum + t.progress, 0) / activeTasks.length
+    tasks.reduce((sum, t) => sum + t.progress, 0) / tasks.length
   )
 
   const handleCancel = async (taskId: string) => {
@@ -58,7 +60,7 @@ export function BackgroundTaskBar() {
       >
         <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: 'var(--color-accent)' }} />
         <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
-          {activeTasks.length} task{activeTasks.length > 1 ? 's' : ''} running
+          {tasks.length} task{tasks.length > 1 ? 's' : ''} running
         </span>
 
         {/* Mini progress bar */}
@@ -89,7 +91,7 @@ export function BackgroundTaskBar() {
             className="overflow-hidden"
           >
             <div className="flex flex-col gap-1.5 px-4 pb-3">
-              {activeTasks.map((task) => (
+              {tasks.map((task) => (
                 <div key={task.taskId} className="flex items-center gap-3">
                   <span className="text-base w-5 shrink-0">{TYPE_ICONS[task.artifactType] ?? '⚙'}</span>
                   <span className="text-xs w-28 shrink-0 truncate" style={{ color: 'var(--color-text-primary)' }}>

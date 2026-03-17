@@ -37,7 +37,7 @@ interface Props {
 
 export function NotebookScreen({ notebookId }: Props) {
   const { notebooks, setActiveNotebook, renameNotebook } = useNotebookStore()
-  const { closeCanvas, canvasItem, generate } = useArtifactStore()
+  const { closeCanvas, canvasItem, generate, fetchArtifacts } = useArtifactStore()
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [shareOpen, setShareOpen] = useState(false)
   const [addSourceOpen, setAddSourceOpen] = useState(false)
@@ -50,7 +50,9 @@ export function NotebookScreen({ notebookId }: Props) {
   // Connect WS once when notebook screen mounts
   useEffect(() => {
     ws.connect(8008)
-  }, [])
+    // Eagerly fetch artifacts to reconcile any in-progress tasks from a previous session
+    fetchArtifacts(notebookId, true)
+  }, [notebookId])
 
   // Listen for palette events
   useEffect(() => {
@@ -213,7 +215,7 @@ export function NotebookScreen({ notebookId }: Props) {
           </div>
 
           {/* Background task bar — scoped to right content area */}
-          <BackgroundTaskBar />
+          <BackgroundTaskBar notebookId={notebookId} />
         </div>
 
         {/* Canvas panel */}

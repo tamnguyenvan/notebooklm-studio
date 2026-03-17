@@ -65,10 +65,30 @@ export const useArtifactStore = create<ArtifactStore>((set) => ({
         // Keep any locally-known types not yet returned by the API
         const freshTypes = new Set(merged.map((a) => a.type))
         const localOnly = current.filter((a) => !freshTypes.has(a.type))
+        const allArtifacts = [...merged, ...localOnly]
+
+        // Reconcile: if the API says an artifact is still 'generating' but we have
+        // no ActiveTask for it (e.g. after app restart), re-add it so the task bar
+        // and watchdog pick it up.
+        const existingTaskIds = new Set(s.activeTasks.map((t) => t.taskId))
+        const reconciledTasks = [...s.activeTasks]
+        for (const a of allArtifacts) {
+          if (a.status === 'generating' && a.task_id && !existingTaskIds.has(a.task_id)) {
+            reconciledTasks.push({
+              taskId: a.task_id,
+              notebookId,
+              artifactType: a.type,
+              progress: a.progress ?? 0,
+              message: 'Resuming…',
+            })
+          }
+        }
+
         return {
-          artifacts: { ...s.artifacts, [notebookId]: [...merged, ...localOnly] },
+          artifacts: { ...s.artifacts, [notebookId]: allArtifacts },
           loading: { ...s.loading, [notebookId]: false },
           lastFetched: { ...s.lastFetched, [notebookId]: Date.now() },
+          activeTasks: reconciledTasks,
         }
       })
     } catch {
