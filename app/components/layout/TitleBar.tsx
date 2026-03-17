@@ -9,6 +9,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
 import { useAuthStore } from '../../stores/authStore'
 import { useNotificationStore, AppNotification } from '../../stores/notificationStore'
+import { Menu } from '../ui/Dropdown'
 
 const FEEDBACK_URL = 'https://feedback.notebooklm-studio.app'
 
@@ -35,7 +36,6 @@ export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen }: Title
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [notiOpen, setNotiOpen] = useState(false)
   const [isMaximized, setIsMaximized] = useState(false)
-  const avatarRef = useRef<HTMLDivElement>(null)
   const notiRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
 
@@ -50,7 +50,6 @@ export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen }: Title
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) setAvatarOpen(false)
       if (notiRef.current && !notiRef.current.contains(e.target as Node)) setNotiOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -237,39 +236,44 @@ export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen }: Title
         </div>
 
         {/* Avatar */}
-        <div className="relative" ref={avatarRef}>
-          <button
-            onClick={() => { setAvatarOpen((v) => !v); setNotiOpen(false) }}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white transition-opacity hover:opacity-80"
-            style={{ background: 'var(--color-accent)' }}
-            title={account?.display_name ?? account?.email ?? 'Account'}
-          >
-            {initials}
-          </button>
-          <AP>
-            {avatarOpen && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                className="absolute right-0 top-9 w-52 rounded-xl py-1 shadow-xl"
-                style={{ background: 'var(--color-content-bg)', border: '1px solid var(--color-separator)', zIndex: 200 }}
-              >
-                <div className="px-3 py-2" style={{ borderBottom: '1px solid var(--color-separator)' }}>
-                  <p className="truncate text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                    {account?.display_name ?? account?.email ?? 'Account'}
-                  </p>
-                  {account?.display_name && (
-                    <p className="truncate text-xs" style={{ color: 'var(--color-text-secondary)' }}>{account.email}</p>
-                  )}
-                </div>
-                <DropdownItem icon={<Settings size={13} />} label="Settings" onClick={() => { setAvatarOpen(false); onSettingsOpen() }} />
-                <DropdownItem icon={<LogOut size={13} />} label="Sign out" onClick={() => { setAvatarOpen(false); logout() }} danger />
-              </motion.div>
-            )}
-          </AP>
-        </div>
+        <Menu
+          open={avatarOpen}
+          onOpenChange={(v) => { setAvatarOpen(v); if (v) setNotiOpen(false) }}
+          align="right"
+          width={208}
+          header={
+            <div>
+              <p className="truncate text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                {account?.display_name ?? account?.email ?? 'Account'}
+              </p>
+              {account?.display_name && (
+                <p className="truncate text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{account.email}</p>
+              )}
+            </div>
+          }
+          items={[
+            {
+              icon: <Settings size={13} />,
+              label: 'Settings',
+              onClick: () => { setAvatarOpen(false); onSettingsOpen() },
+            },
+            {
+              icon: <LogOut size={13} />,
+              label: 'Sign out',
+              onClick: () => { setAvatarOpen(false); logout() },
+              danger: true,
+            },
+          ]}
+          trigger={
+            <button
+              className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white transition-opacity hover:opacity-80"
+              style={{ background: 'var(--color-accent)' }}
+              title={account?.display_name ?? account?.email ?? 'Account'}
+            >
+              {initials}
+            </button>
+          }
+        />
       </div>
     </div>
   )
@@ -391,17 +395,6 @@ function NotiRow({ n, onClick, onRemove }: { n: AppNotification; onClick: () => 
         <X size={11} />
       </button>
     </div>
-  )
-}
-
-function DropdownItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button onClick={onClick} className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors"
-      style={{ color: danger ? 'var(--color-error)' : 'var(--color-text-primary)' }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = danger ? 'rgba(255,69,58,0.08)' : 'rgba(0,0,0,0.04)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-      {icon}{label}
-    </button>
   )
 }
 

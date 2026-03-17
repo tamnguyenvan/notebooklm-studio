@@ -12,6 +12,7 @@ import { useNotebookStore } from '../../stores/notebookStore'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useToastStore } from '../../stores/toastStore'
 import { ArtifactType, DownloadRecord } from '../../lib/ipc'
+import { Select, SelectOption } from '../ui/Dropdown'
 
 // ── Type metadata ─────────────────────────────────────────────────────────────
 
@@ -334,22 +335,18 @@ export function LibraryScreen() {
               style={{ color: 'var(--color-text-primary)' }}
             />
           </div>
-          <select
+          <Select<string>
             value={notebookFilter}
-            onChange={(e) => setNotebookFilter(e.target.value)}
-            className="rounded-lg border px-2 py-1.5 text-xs outline-none"
-            style={{
-              borderColor: 'var(--color-separator)',
-              background: 'var(--color-app-bg)',
-              color: 'var(--color-text-primary)',
-              maxWidth: '160px',
-            }}
-          >
-            <option value="">All Notebooks</option>
-            {notebooks.map((nb) => (
-              <option key={nb.id} value={nb.id}>{nb.emoji ? `${nb.emoji} ` : ''}{nb.title}</option>
-            ))}
-          </select>
+            onChange={setNotebookFilter}
+            align="right"
+            options={[
+              { value: '', label: 'All Notebooks' },
+              ...notebooks.map((nb) => ({
+                value: nb.id,
+                label: `${nb.emoji ? nb.emoji + ' ' : ''}${nb.title}`,
+              })),
+            ] as SelectOption<string>[]}
+          />
         </div>
 
         {/* Type chips */}
