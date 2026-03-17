@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 const AP = AnimatePresence as any
 import { useNotebookStore } from '../../stores/notebookStore'
 import { useToastStore } from '../../stores/toastStore'
+import { useSourceStore } from '../../stores/sourceStore'
 import { NewNotebookModal } from '../notebooks/NewNotebookModal'
 import { ShareModal } from '../sharing/ShareModal'
 import { Notebook } from '../../lib/ipc'
@@ -26,6 +27,7 @@ export function Sidebar({
 }) {
   const { notebooks, activeNotebookId, setActiveNotebook, renameNotebook, deleteNotebook, pinNotebook, fetchNotebooks } = useNotebookStore()
   const { show } = useToastStore()
+  const { sources } = useSourceStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -153,11 +155,8 @@ export function Sidebar({
                 >
                   {isRenaming ? (
                     <div
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5"
-                      style={{
-                        background: 'var(--color-accent-subtle)',
-                        borderLeft: '2px solid var(--color-accent)',
-                      }}
+                      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 mx-0.5"
+                      style={{ background: 'var(--color-accent-subtle)' }}
                     >
                       <span className="shrink-0 text-base leading-none">{nb.emoji ?? '📓'}</span>
                       <input
@@ -184,24 +183,42 @@ export function Sidebar({
                         e.preventDefault()
                         setCtxMenu({ nb, x: e.clientX, y: e.clientY })
                       }}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors"
+                      title={nb.title}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 mx-0.5 text-left transition-colors"
                       style={{
-                        background: isActive ? 'var(--color-accent-subtle)' : 'transparent',
-                        color: isActive ? 'var(--color-accent)' : 'var(--color-text-primary)',
-                        borderLeft: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
+                        background: isActive
+                          ? 'var(--color-sidebar-active, rgba(0,0,0,0.09))'
+                          : 'transparent',
                       }}
                       onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                        if (!isActive) e.currentTarget.style.background = 'rgba(0,0,0,0.04)'
+                        if (!isActive) e.currentTarget.style.background = 'var(--color-sidebar-hover, rgba(0,0,0,0.05))'
                       }}
                       onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
                         if (!isActive) e.currentTarget.style.background = 'transparent'
                       }}
                     >
                       <span className="shrink-0 text-base leading-none">{nb.emoji ?? '📓'}</span>
-                      <span className="flex-1 truncate text-sm">{nb.title}</span>
-                      {nb.is_pinned && (
-                        <span className="shrink-0 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>📌</span>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="truncate text-sm font-medium leading-tight"
+                          style={{ color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-primary)' }}
+                        >
+                          {nb.title}
+                        </p>
+                        <p
+                          className="text-[11px] mt-0.5 leading-tight"
+                          style={{ color: 'var(--color-text-tertiary)' }}
+                        >
+                          {(() => {
+                            const liveCount = sources[nb.id]?.length
+                            const count = liveCount ?? nb.source_count
+                            return count > 0
+                              ? `${count} source${count !== 1 ? 's' : ''}`
+                              : 'No sources'
+                          })()}
+                          {nb.is_pinned && ' · Pinned'}
+                        </p>
+                      </div>
                     </button>
                   )}
                 </motion.div>
