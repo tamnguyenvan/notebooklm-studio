@@ -52,6 +52,10 @@ export function CanvasPanel() {
   const { addDownload } = useDownloadStore()
   const [expanded, setExpanded] = useState(false)
   const [showFormats, setShowFormats] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [lastItem, setLastItem] = useState<any>(canvasItem)
+  if (canvasItem && canvasItem !== lastItem) setLastItem(canvasItem)
+  const displayItem = canvasItem ?? lastItem
 
   // Canvas shortcuts — only active when canvas is open
   const dispatchCanvasAction = useCallback((action: string) => {
@@ -99,9 +103,11 @@ export function CanvasPanel() {
     }
   }
 
+  const isOpen = !!canvasItem
+
   return (
     <AnimatePresence>
-      {canvasItem && (
+      {isOpen && (
         <>
           {/* Backdrop — click to close */}
           <motion.div
@@ -131,51 +137,55 @@ export function CanvasPanel() {
             }}
           >
           {/* Header */}
-          <div
-            className="flex items-center gap-2 px-3 py-3 border-b shrink-0"
-            style={{ borderColor: 'var(--color-separator)' }}
-          >
-            <span className="flex-1 text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-              {'type' in canvasItem && canvasItem.type === 'note'
-                ? 'Note'
-                : ARTIFACT_LABELS[(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType]}
-            </span>
-            <button
-              onClick={() => setExpanded((e) => !e)}
-              className="p-1.5 rounded transition-colors"
-              style={{ color: 'var(--color-text-secondary)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              title={expanded ? 'Collapse' : 'Expand'}
+          {displayItem && (
+            <div
+              className="flex items-center gap-2 px-3 py-3 border-b shrink-0"
+              style={{ borderColor: 'var(--color-separator)' }}
             >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={closeCanvas}
-              className="p-1.5 rounded transition-colors"
-              style={{ color: 'var(--color-text-secondary)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              title="Close"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+              <span className="flex-1 text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                {'type' in displayItem && displayItem.type === 'note'
+                  ? 'Note'
+                  : ARTIFACT_LABELS[(displayItem as { notebookId: string; artifactType: ArtifactType }).artifactType]}
+              </span>
+              <button
+                onClick={() => setExpanded((e) => !e)}
+                className="p-1.5 rounded transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                title={expanded ? 'Collapse' : 'Expand'}
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={closeCanvas}
+                className="p-1.5 rounded transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                title="Close"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
-          {/* Viewer */}
-          <div className="flex-1 overflow-hidden">
-            {'type' in canvasItem && canvasItem.type === 'note' ? (
-              <NoteEditor notebookId={canvasItem.notebookId} noteId={canvasItem.noteId} />
-            ) : (
-              <ViewerSwitch
-                notebookId={(canvasItem as { notebookId: string; artifactType: ArtifactType }).notebookId}
-                artifactType={(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType}
-              />
-            )}
-          </div>
+          {/* Viewer — always mounted while panel exists to preserve media state */}
+          {displayItem && (
+            <div className="flex-1 overflow-hidden">
+              {'type' in displayItem && displayItem.type === 'note' ? (
+                <NoteEditor notebookId={displayItem.notebookId} noteId={displayItem.noteId} />
+              ) : (
+                <ViewerSwitch
+                  notebookId={(displayItem as { notebookId: string; artifactType: ArtifactType }).notebookId}
+                  artifactType={(displayItem as { notebookId: string; artifactType: ArtifactType }).artifactType}
+                />
+              )}
+            </div>
+          )}
 
           {/* Footer — only show download for artifacts, not notes */}
-          {'type' in canvasItem && canvasItem.type === 'note' ? null : (
+          {displayItem && !('type' in displayItem && displayItem.type === 'note') && (
             <div
               className="flex items-center justify-between px-3 py-2.5 border-t shrink-0"
               style={{ borderColor: 'var(--color-separator)' }}
@@ -183,7 +193,7 @@ export function CanvasPanel() {
               <div className="relative">
                 <button
                   onClick={() => {
-                    const artifactCanvasItem = canvasItem as { notebookId: string; artifactType: ArtifactType }
+                    const artifactCanvasItem = displayItem as { notebookId: string; artifactType: ArtifactType }
                     const formats = DOWNLOAD_FORMATS[artifactCanvasItem.artifactType]
                     if (formats.length === 1) handleDownload(formats[0])
                     else setShowFormats((s) => !s)
@@ -198,7 +208,7 @@ export function CanvasPanel() {
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download
-                  {DOWNLOAD_FORMATS[(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType].length > 1 && ' ▾'}
+                  {DOWNLOAD_FORMATS[(displayItem as { notebookId: string; artifactType: ArtifactType }).artifactType].length > 1 && ' ▾'}
                 </button>
 
                 {/* Format picker */}
@@ -217,7 +227,7 @@ export function CanvasPanel() {
                         minWidth: '120px',
                       }}
                     >
-                      {DOWNLOAD_FORMATS[(canvasItem as { notebookId: string; artifactType: ArtifactType }).artifactType].map((fmt) => (
+                      {DOWNLOAD_FORMATS[(displayItem as { notebookId: string; artifactType: ArtifactType }).artifactType].map((fmt) => (
                         <button
                           key={fmt.format}
                           onClick={() => handleDownload(fmt)}
