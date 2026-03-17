@@ -166,6 +166,7 @@ function SourceRow({ source, notebookId }: { source: Source; notebookId: string 
 export function SourcesPanel({ notebookId }: { notebookId: string }) {
   const { sources, loading, error, fetchSources, updateSourceStatus } = useSourceStore()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const notebookSources = sources[notebookId] ?? []
   const isLoading = loading[notebookId] ?? false
@@ -189,6 +190,11 @@ export function SourcesPanel({ notebookId }: { notebookId: string }) {
     return unsub
   }, [notebookId])
 
+  const handleRefreshAll = async () => {
+    setRefreshing(true)
+    try { await fetchSources(notebookId, true) } finally { setRefreshing(false) }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -204,16 +210,29 @@ export function SourcesPanel({ notebookId }: { notebookId: string }) {
             {notebookSources.length} source{notebookSources.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors"
-          style={{ background: 'var(--color-accent)', color: '#fff' }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-hover)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
-        >
-          <Plus className="w-4 h-4" />
-          Add source
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefreshAll}
+            disabled={refreshing}
+            className="flex items-center justify-center w-8 h-8 rounded-xl transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            title="Refresh sources"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors"
+            style={{ background: 'var(--color-accent)', color: '#fff' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
+          >
+            <Plus className="w-4 h-4" />
+            Add source
+          </button>
+        </div>
       </div>
 
       {/* Body */}

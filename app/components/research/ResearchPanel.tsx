@@ -34,7 +34,7 @@ export function ResearchPanel({ notebookId }: Props) {
     onTaskError,
   } = useResearchStore()
 
-  const { addSource } = useSourceStore()
+  const { addSource, fetchSources } = useSourceStore()
   const { show: showToast } = useToastStore()
 
   const [query, setQuery] = useState('')
@@ -107,6 +107,8 @@ export function ResearchPanel({ notebookId }: Props) {
       const src = await importOne(notebookId, result)
       addSource({ ...src, notebook_id: notebookId })
       showToast({ type: 'success', message: `"${result.title}" added as source` })
+      // Refresh sources panel after a short delay to pick up indexing status
+      setTimeout(() => fetchSources(notebookId, true), 2000)
     } catch (e) {
       showToast({ type: 'error', message: `Import failed: ${String(e)}` })
     } finally {
@@ -121,6 +123,7 @@ export function ResearchPanel({ notebookId }: Props) {
       const imported = await importSelected(notebookId)
       imported.forEach((src) => addSource({ ...src, notebook_id: notebookId }))
       showToast({ type: 'success', message: `${imported.length} source${imported.length !== 1 ? 's' : ''} added` })
+      setTimeout(() => fetchSources(notebookId, true), 2000)
     } catch (e) {
       showToast({ type: 'error', message: `Import failed: ${String(e)}` })
     } finally {
@@ -135,6 +138,7 @@ export function ResearchPanel({ notebookId }: Props) {
       const imported = await importAll(notebookId)
       imported.forEach((src) => addSource({ ...src, notebook_id: notebookId }))
       showToast({ type: 'success', message: `${imported.length} source${imported.length !== 1 ? 's' : ''} added` })
+      setTimeout(() => fetchSources(notebookId, true), 2000)
     } catch (e) {
       showToast({ type: 'error', message: `Import failed: ${String(e)}` })
     } finally {

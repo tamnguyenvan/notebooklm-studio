@@ -20,7 +20,7 @@ async def init_client() -> bool:
     global _client
     try:
         from notebooklm import NotebookLMClient
-        _client = await NotebookLMClient.from_storage()
+        _client = await NotebookLMClient.from_storage(timeout=120.0)
         await _client.__aenter__()
         print("[sidecar] Client initialised from storage.", flush=True)
         return True
