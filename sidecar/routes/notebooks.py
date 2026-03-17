@@ -2,11 +2,36 @@
 Notebook routes — list, create, rename, delete, pin
 """
 from __future__ import annotations
+import json
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from services.client import get_client
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
+
+# ── Pin state persistence ─────────────────────────────────────────────────────
+# Stored in the same directory as this file so it survives sidecar restarts.
+_PIN_FILE = Path(__file__).parent.parent / "data" / "pinned.json"
+
+def _load_pinned() -> dict[str, int]:
+    """Returns {notebook_id: pin_timestamp} — higher = pinned later = shown first."""
+    try:
+        _PIN_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if _PIN_FILE.exists():
+            return json.loads(_PIN_FILE.read_text())
+    except Exception:
+        pass
+    return {}
+
+def _save_pinned(data: dict[str, int]) -> None:
+    try:
+        _PIN_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _PIN_FILE.write_text(json.dumps(data))
+    except Exception:
+        pass
+
+_pinned: dict[str, int] = _load_pinned()
 
 
 class CreateNotebookBody(BaseModel):
@@ -54,22 +79,23 @@ async def rename_notebook(notebook_id: str, body: RenameNotebookBody, client=Dep
 async def delete_notebook(notebook_id: str, client=Depends(get_client)):
     try:
         await client.notebooks.delete(notebook_id)
+        # Clean up pin state
+        if notebook_id in _pinned:
+            del _pinned[notebook_id]
+            _save_pinned(_pinned)
         return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": "internal_error", "message": str(e)})
 
 
-# notebooklm-py doesn't expose a pin API — we track pin state locally in memory.
-# A real implementation would persist to SQLite; for now an in-process set is fine.
-_pinned: set[str] = set()
-
-
 @router.put("/{notebook_id}/pin")
 async def pin_notebook(notebook_id: str, body: PinNotebookBody):
+    import time
     if body.pinned:
-        _pinned.add(notebook_id)
+        _pinned[notebook_id] = int(time.time() * 1000)  # ms timestamp
     else:
-        _pinned.discard(notebook_id)
+        _pinned.pop(notebook_id, None)
+    _save_pinned(_pinned)
     return {"status": "ok", "pinned": notebook_id in _pinned}
 
 
@@ -82,15 +108,15 @@ def _serialize(nb) -> dict:
             created = nb.created_at.isoformat()
     except Exception:
         pass
-    # notebooklm-py Notebook has no updated_at; use created_at as fallback
     updated = created
 
     return {
         "id": nb.id,
         "title": nb.title or "Untitled notebook",
-        "emoji": None,  # notebooklm-py doesn't expose emoji
+        "emoji": None,
         "created_at": created,
         "updated_at": updated,
         "source_count": getattr(nb, "sources_count", 0),
         "is_pinned": nb.id in _pinned,
+        "pin_order": _pinned.get(nb.id, 0),  # frontend uses this for ordering
     }

@@ -23,6 +23,7 @@ export interface Notebook {
   updated_at: string | null
   source_count: number
   is_pinned: boolean
+  pin_order?: number
 }
 
 export type SourceType = 'url' | 'youtube' | 'pdf' | 'text' | 'gdrive' | string

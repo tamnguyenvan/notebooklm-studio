@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, BookOpen, Library, Pencil, Pin, PinOff, Trash2, Share2, Search, X, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,8 +13,19 @@ import { NewNotebookModal } from '../notebooks/NewNotebookModal'
 import { ShareModal } from '../sharing/ShareModal'
 import { Notebook } from '../../lib/ipc'
 
+const PIN_ICON = (
+  <svg width="10" height="10" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline', flexShrink: 0 }}>
+    <path style={{ fill: 'var(--color-text-tertiary)' }} d="m240.294 308.285-36.58-36.58a8.62 8.62 0 0 0-12.194 0L20.811 442.413a8.6 8.6 0 0 0-2.083 3.37L.437 500.654c-2.201 6.602 4.288 13.114 10.906 10.907l54.871-18.291a8.64 8.64 0 0 0 3.37-2.083l170.709-170.709a8.62 8.62 0 0 0 .001-12.193"/>
+    <path style={{ fill: '#e35336' }} d="M468.888 158.879 353.119 43.111a8.624 8.624 0 0 0-12.193 0L176.314 207.722a8.62 8.62 0 0 0 0 12.194l115.769 115.769a8.62 8.62 0 0 0 12.194 0l164.612-164.612a8.624 8.624 0 0 0-.001-12.194"/>
+    <path style={{ fill: '#d93c1c' }} d="M336.291 317.017c-10.295-32.976-28.732-63.403-53.319-87.99s-55.012-43.024-87.99-53.319c-31.906-9.962-66.249-12.372-99.316-6.979-6.794 1.109-9.585 9.729-4.708 14.607L328.662 421.04c4.88 4.878 13.499 2.078 14.606-4.709 5.397-33.065 2.983-67.407-6.977-99.314m163.082-188.622L383.603 12.627C375.461 4.485 364.635 0 353.119 0c-11.515 0-22.341 4.485-30.484 12.627-8.142 8.143-12.627 18.968-12.627 30.484s4.485 22.341 12.627 30.484l115.769 115.769c8.143 8.143 18.969 12.627 30.485 12.627s22.341-4.485 30.483-12.627S512 170.395 512 158.88s-4.485-22.341-12.627-30.485"/>
+  </svg>
+)
+
 const MENU_W = 176
 const MENU_H = 200
+const RECENTS_MIN_H = 72
+const RECENTS_MAX_H = 300
+const RECENTS_DEFAULT_H = 200
 
 export function Sidebar({
   onLibraryOpen,
@@ -35,6 +46,23 @@ export function Sidebar({
   const [shareNotebook, setShareNotebook] = useState<Notebook | null>(null)
   const [search, setSearch] = useState('')
   const [recentsOpen, setRecentsOpen] = useState(true)
+  const [recentsHeight, setRecentsHeight] = useState(RECENTS_DEFAULT_H)
+
+  const onResizeDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startH = recentsHeight
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(RECENTS_MIN_H, Math.min(RECENTS_MAX_H, startH + ev.clientY - startY))
+      setRecentsHeight(next)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [recentsHeight])
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ nb: Notebook; x: number; y: number } | null>(null)
@@ -78,9 +106,9 @@ export function Sidebar({
   }
 
   // Recents: resolve notebook objects in order, skip active
-  const recentNotebooks = recentIds
+  const recentNotebooks = (Array.isArray(recentIds) ? recentIds : [])
     .map((id) => notebooks.find((n) => n.id === id))
-    .filter((n): n is Notebook => !!n && n.id !== activeNotebookId)
+    .filter((n): n is Notebook => !!n)
     .slice(0, 5)
 
   // Filtered notebook list
@@ -106,15 +134,11 @@ export function Sidebar({
             borderRight: '1px solid var(--color-separator)',
           }}
         >
-          {/* ── Recents section ── */}
-          {recentNotebooks.length > 0 && (
-            <div className="flex flex-col shrink-0">
-              {/* Header — click to toggle */}
+          {/* ── Recents section ── always rendered to preserve height */}
+          <div className="flex flex-col shrink-0">
               <button
                 onClick={() => setRecentsOpen((v) => !v)}
-                className="flex items-center gap-1.5 px-4 pb-1 pt-3 w-full transition-colors"
-                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '')}
+                className="flex items-center gap-1.5 px-4 pb-1 pt-3 w-full"
               >
                 <Clock size={10} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
                 <span className="flex-1 text-left text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -125,43 +149,41 @@ export function Sidebar({
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   style={{ display: 'flex', color: 'var(--color-text-tertiary)' }}
                 >
-                  {/* chevron down as inline svg to avoid extra import */}
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                     <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </motion.span>
               </button>
 
-              {/* Collapsible list — fixed height when open */}
-              <AP initial={false}>
-                {recentsOpen && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                    className="overflow-hidden"
+              {recentsOpen && (
+                <div>
+                  <div className="overflow-y-auto px-2" style={{ height: recentsHeight }}>
+                    {recentNotebooks.length === 0 ? (
+                      <p className="px-2.5 py-2 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>No recent notebooks</p>
+                    ) : recentNotebooks.map((nb) => (
+                      <RecentRow
+                        key={nb.id}
+                        nb={nb}
+                        sourceCount={sources[nb.id]?.length ?? nb.source_count}
+                        isActive={nb.id === activeNotebookId}
+                        onOpen={() => setActiveNotebook(nb.id)}
+                        onRemove={() => removeRecent(nb.id)}
+                        onContextMenu={(x, y) => setCtxMenu({ nb, x, y })}
+                      />
+                    ))}
+                  </div>
+                  {/* Drag handle */}
+                  <div
+                    onMouseDown={onResizeDrag}
+                    className="flex items-center justify-center h-3 cursor-ns-resize select-none"
                   >
-                    <div className="overflow-y-auto px-2 pb-1" style={{ maxHeight: 180 }}>
-                      {recentNotebooks.map((nb) => (
-                        <RecentRow
-                          key={nb.id}
-                          nb={nb}
-                          sourceCount={sources[nb.id]?.length ?? nb.source_count}
-                          isActive={nb.id === activeNotebookId}
-                          onOpen={() => setActiveNotebook(nb.id)}
-                          onRemove={() => removeRecent(nb.id)}
-                          onContextMenu={(x, y) => setCtxMenu({ nb, x, y })}
-                        />
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AP>
+                    <div className="w-8 h-0.5 rounded-full" style={{ background: 'var(--color-separator)' }} />
+                  </div>
+                </div>
+              )}
 
               <div className="mx-4 mb-1 h-px" style={{ background: 'var(--color-separator)' }} />
             </div>
-          )}
 
           {/* ── Notebooks section ── */}
           <div className="flex flex-1 flex-col overflow-hidden min-h-0">
@@ -240,12 +262,12 @@ export function Sidebar({
                           <span className="shrink-0 text-base leading-none">{nb.emoji ?? '📓'}</span>
                           <div className="flex-1 min-w-0">
                             <p className="truncate text-sm font-medium leading-tight" style={{ color: 'var(--color-text-primary)' }}>{nb.title}</p>
-                            <p className="text-[11px] mt-0.5 leading-tight" style={{ color: 'var(--color-text-tertiary)' }}>
+                            <p className="text-[11px] mt-0.5 leading-tight flex items-center gap-1" style={{ color: 'var(--color-text-tertiary)' }}>
                               {(() => {
                                 const count = sources[nb.id]?.length ?? nb.source_count
                                 return count > 0 ? `${count} source${count !== 1 ? 's' : ''}` : 'No sources'
                               })()}
-                              {nb.is_pinned && ' · Pinned'}
+                              {nb.is_pinned && <span className="text-[10px]"> · 📌</span>}
                             </p>
                           </div>
                         </button>

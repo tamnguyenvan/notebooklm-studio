@@ -632,6 +632,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
             app.manage(Arc::new(Mutex::new(None::<CommandChild>)));
             let app_handle = app.handle().clone();

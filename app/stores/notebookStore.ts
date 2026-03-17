@@ -1,23 +1,39 @@
 import { create } from 'zustand'
+import { LazyStore } from '@tauri-apps/plugin-store'
 import { ipc, Notebook } from '../lib/ipc'
 
-const RECENTS_KEY = 'nb_recents'
-const RECENTS_MAX = 8
+const RECENTS_MAX = 5
 
-function loadRecents(): string[] {
-  if (typeof localStorage === 'undefined') return []
-  try { return JSON.parse(localStorage.getItem(RECENTS_KEY) ?? '[]') } catch { return [] }
+// tauri-plugin-store — persists to app data dir, survives restarts
+const appStore = new LazyStore('app-prefs.json', { autoSave: true })
+
+async function loadPinOrder(): Promise<Record<string, number>> {
+  try { return (await appStore.get<Record<string, number>>('pin_order')) ?? {} } catch { return {} }
+}
+async function savePinOrder(order: Record<string, number>) {
+  try { await appStore.set('pin_order', order) } catch {}
 }
 
-function saveRecents(ids: string[]) {
-  if (typeof localStorage === 'undefined') return
-  localStorage.setItem(RECENTS_KEY, JSON.stringify(ids))
+// Recents: simple deque of max 5, persisted via tauri-plugin-store
+async function loadRecents(): Promise<string[]> {
+  try {
+    const val = await appStore.get<string[]>('recents')
+    return Array.isArray(val) ? val : []
+  } catch { return [] }
+}
+async function saveRecents(ids: string[]) {
+  try { await appStore.set('recents', ids) } catch {}
 }
 
-// Shared sort: pinned first, then newest first
-function sortNotebooks(list: Notebook[]): Notebook[] {
+function pushRecent(id: string, current: string[]): string[] {
+  // Remove existing entry, prepend, cap at RECENTS_MAX
+  return [id, ...current.filter(r => r !== id)].slice(0, RECENTS_MAX)
+}
+
+function sortNotebooks(list: Notebook[], pinOrder: Record<string, number>): Notebook[] {
   return [...list].sort((a, b) => {
     if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1
+    if (a.is_pinned && b.is_pinned) return (pinOrder[b.id] ?? 0) - (pinOrder[a.id] ?? 0)
     const ta = a.updated_at ?? a.created_at ?? ''
     const tb = b.updated_at ?? b.created_at ?? ''
     return tb.localeCompare(ta)
@@ -28,6 +44,7 @@ interface NotebookStore {
   notebooks: Notebook[]
   activeNotebookId: string | null
   recentIds: string[]
+  pinOrder: Record<string, number>
   loading: boolean
   error: string | null
 
@@ -38,7 +55,6 @@ interface NotebookStore {
   pinNotebook: (id: string, pinned: boolean) => Promise<void>
   setActiveNotebook: (id: string | null) => void
   removeRecent: (id: string) => void
-  // Optimistic helpers
   _applyOptimistic: (notebooks: Notebook[]) => void
 }
 
@@ -46,14 +62,20 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
   notebooks: [],
   activeNotebookId: null,
   recentIds: loadRecents(),
+  pinOrder: {},
   loading: false,
   error: null,
 
   fetchNotebooks: async () => {
     set({ loading: true, error: null })
     try {
-      const notebooks = await ipc.listNotebooks()
-      set({ notebooks: sortNotebooks(notebooks), loading: false })
+      const [notebooks, pinOrder, recents] = await Promise.all([
+        ipc.listNotebooks(),
+        loadPinOrder(),
+        loadRecents(),
+      ])
+      const merged = notebooks.map(n => ({ ...n, is_pinned: n.id in pinOrder }))
+      set({ notebooks: sortNotebooks(merged, pinOrder), pinOrder, recentIds: recents, loading: false })
     } catch (e) {
       set({ loading: false, error: String(e) })
     }
@@ -61,73 +83,67 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
 
   createNotebook: async (title, emoji) => {
     const nb = await ipc.createNotebook(title, emoji)
-    // Insert then re-sort so pinned notebooks stay on top
-    set((s) => ({ notebooks: sortNotebooks([nb, ...s.notebooks]) }))
+    set((s) => ({ notebooks: sortNotebooks([nb, ...s.notebooks], s.pinOrder) }))
     return nb
   },
 
   renameNotebook: async (id, title) => {
-    // Optimistic
-    set((s) => ({
-      notebooks: s.notebooks.map((n) => (n.id === id ? { ...n, title } : n)),
-    }))
+    set((s) => ({ notebooks: s.notebooks.map((n) => (n.id === id ? { ...n, title } : n)) }))
     try {
       const updated = await ipc.renameNotebook(id, title)
-      set((s) => ({
-        notebooks: s.notebooks.map((n) => (n.id === id ? { ...n, ...updated } : n)),
-      }))
+      set((s) => ({ notebooks: s.notebooks.map((n) => (n.id === id ? { ...n, ...updated } : n)) }))
     } catch (e) {
-      // Rollback by re-fetching
-      get().fetchNotebooks()
-      throw e
+      get().fetchNotebooks(); throw e
     }
   },
 
   deleteNotebook: async (id) => {
-    // Optimistic removal
     const prev = get().notebooks
     set((s) => ({ notebooks: s.notebooks.filter((n) => n.id !== id) }))
     try {
       await ipc.deleteNotebook(id)
       if (get().activeNotebookId === id) set({ activeNotebookId: null })
-      // Also remove from recents
       const recents = get().recentIds.filter((r) => r !== id)
-      saveRecents(recents)
-      set({ recentIds: recents })
+      void saveRecents(recents)
+      const pinOrder = { ...get().pinOrder }
+      delete pinOrder[id]
+      await savePinOrder(pinOrder)
+      set({ recentIds: recents, pinOrder })
     } catch (e) {
-      set({ notebooks: prev })
-      throw e
+      set({ notebooks: prev }); throw e
     }
   },
 
   pinNotebook: async (id, pinned) => {
+    const pinOrder = { ...get().pinOrder }
+    if (pinned) pinOrder[id] = Date.now()
+    else delete pinOrder[id]
+    await savePinOrder(pinOrder)
     set((s) => ({
-      notebooks: sortNotebooks(s.notebooks.map((n) => (n.id === id ? { ...n, is_pinned: pinned } : n))),
+      pinOrder,
+      notebooks: sortNotebooks(
+        s.notebooks.map((n) => (n.id === id ? { ...n, is_pinned: pinned } : n)),
+        pinOrder
+      ),
     }))
-    try {
-      await ipc.pinNotebook(id, pinned)
-    } catch (e) {
-      get().fetchNotebooks()
-      throw e
-    }
+    // Fire-and-forget to backend (best effort)
+    ipc.pinNotebook(id, pinned).catch(() => {})
   },
 
   setActiveNotebook: (id) => {
     if (id) {
-      // Push previous active to recents
-      const prev = get().activeNotebookId
-      if (prev && prev !== id) {
-        const recents = [prev, ...get().recentIds.filter((r) => r !== prev && r !== id)].slice(0, RECENTS_MAX)
-        saveRecents(recents)
-        set({ recentIds: recents })
-      }
+      // Push the newly opened notebook to the front of recents immediately
+      const recents = pushRecent(id, get().recentIds)
+      void saveRecents(recents)
+      set({ activeNotebookId: id, recentIds: recents })
+    } else {
+      set({ activeNotebookId: null })
     }
-    set({ activeNotebookId: id })
   },
 
   removeRecent: (id) => {
     const recents = get().recentIds.filter((r) => r !== id)
-    saveRecents(recents)
+    void saveRecents(recents)
     set({ recentIds: recents })
   },
 
