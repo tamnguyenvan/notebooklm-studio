@@ -1,8 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Download, RefreshCw, AlertCircle } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
+import {
+  Mic, Video, Presentation, HelpCircle, CreditCard,
+  Image, FileText, Table, GitBranch,
+  Play, RefreshCw, AlertCircle, Loader2,
+} from 'lucide-react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useToastStore } from '../../stores/toastStore'
 import { ws } from '../../lib/ws'
@@ -13,23 +19,84 @@ interface Props {
   notebookId: string
 }
 
-const ARTIFACT_TYPES: { type: ArtifactType; label: string; icon: string }[] = [
-  { type: 'audio',       label: 'Audio Overview', icon: '🎙' },
-  { type: 'video',       label: 'Video Overview',  icon: '📹' },
-  { type: 'slides',      label: 'Slide Deck',      icon: '📑' },
-  { type: 'quiz',        label: 'Quiz',            icon: '❓' },
-  { type: 'flashcards',  label: 'Flashcards',      icon: '🃏' },
-  { type: 'infographic', label: 'Infographic',     icon: '🖼' },
-  { type: 'report',      label: 'Report',          icon: '📄' },
-  { type: 'data_table',  label: 'Data Table',      icon: '📊' },
-  { type: 'mind_map',    label: 'Mind Map',        icon: '🧠' },
+interface ArtifactMeta {
+  type: ArtifactType
+  label: string
+  description: string
+  icon: React.ReactNode
+  thumbnail: string | null
+}
+
+const ARTIFACT_TYPES: ArtifactMeta[] = [
+  {
+    type: 'audio',
+    label: 'Audio Overview',
+    description: 'Summarize your notes into an audio podcast',
+    icon: <Mic size={16} />,
+    thumbnail: '/thumbnails/audio.png',
+  },
+  {
+    type: 'video',
+    label: 'Video Summary',
+    description: 'Generate a video summary of your notebook',
+    icon: <Video size={16} />,
+    thumbnail: '/thumbnails/video.png',
+  },
+  {
+    type: 'slides',
+    label: 'Slides',
+    description: 'Create a slide deck from your notes',
+    icon: <Presentation size={16} />,
+    thumbnail: '/thumbnails/slides.png',
+  },
+  {
+    type: 'quiz',
+    label: 'Quiz',
+    description: 'Generate quiz questions to test knowledge',
+    icon: <HelpCircle size={16} />,
+    thumbnail: '/thumbnails/quiz.png',
+  },
+  {
+    type: 'flashcards',
+    label: 'Flashcards',
+    description: 'Create flashcards for studying',
+    icon: <CreditCard size={16} />,
+    thumbnail: '/thumbnails/flashcards.png',
+  },
+  {
+    type: 'infographic',
+    label: 'Infographic',
+    description: 'Generate a visual infographic',
+    icon: <Image size={16} />,
+    thumbnail: '/thumbnails/infographic.png',
+  },
+  {
+    type: 'report',
+    label: 'Report',
+    description: 'Generate a detailed report',
+    icon: <FileText size={16} />,
+    thumbnail: '/thumbnails/report.png',
+  },
+  {
+    type: 'data_table',
+    label: 'Data Table',
+    description: 'Extract structured data from sources',
+    icon: <Table size={16} />,
+    thumbnail: '/thumbnails/data_table.png',
+  },
+  {
+    type: 'mind_map',
+    label: 'Mind Map',
+    description: 'Generate a visual mind map',
+    icon: <GitBranch size={16} />,
+    thumbnail: '/thumbnails/mind_map.png',
+  },
 ]
 
 export function StudioPanel({ notebookId }: Props) {
   const { artifacts, loading, fetchArtifacts, generate, onTaskProgress, onTaskComplete, onTaskError, openCanvas } = useArtifactStore()
   const { show } = useToastStore()
   const [modalType, setModalType] = useState<ArtifactType | null>(null)
-  const [generating, setGenerating] = useState<Record<string, boolean>>({})
 
   const notebookArtifacts = artifacts[notebookId] ?? []
 
@@ -37,7 +104,6 @@ export function StudioPanel({ notebookId }: Props) {
     fetchArtifacts(notebookId)
   }, [notebookId])
 
-  // Subscribe to WS task events
   useEffect(() => {
     const unsubs = [
       ws.on<{ task_id: string; notebook_id: string; progress: number; message: string }>(
@@ -68,54 +134,85 @@ export function StudioPanel({ notebookId }: Props) {
 
   const handleGenerate = async (config: GenerateConfig) => {
     setModalType(null)
-    setGenerating((g) => ({ ...g, [config.type]: true }))
     try {
       await generate(notebookId, config)
     } catch (e) {
       show({ type: 'error', message: `Failed to start generation: ${String(e)}` })
-    } finally {
-      setGenerating((g) => ({ ...g, [config.type]: false }))
     }
   }
 
   const getArtifact = (type: ArtifactType): Artifact | undefined =>
     notebookArtifacts.find((a) => a.type === type)
 
-  if (loading[notebookId]) {
+  if (loading[notebookId] && notebookArtifacts.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--color-accent)', borderTopColor: 'transparent' }} />
+      <div className="flex flex-col h-full overflow-y-auto">
+        <div className="px-6 pt-6 pb-2">
+          <div className="h-5 w-48 rounded-lg animate-pulse" style={{ background: 'var(--color-separator)' }} />
+          <div className="h-3.5 w-64 rounded-lg animate-pulse mt-2" style={{ background: 'var(--color-separator)' }} />
+        </div>
+        <div className="px-6 pb-6 pt-3 grid grid-cols-3 gap-3">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-2xl overflow-hidden"
+              style={{ border: '1px solid var(--color-separator)', background: 'var(--color-elevated)' }}
+            >
+              <div className="animate-pulse" style={{ height: 88, background: 'var(--color-separator)' }} />
+              <div className="p-3 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 rounded animate-pulse" style={{ background: 'var(--color-separator)' }} />
+                  <div className="h-4 w-24 rounded animate-pulse" style={{ background: 'var(--color-separator)' }} />
+                </div>
+                <div className="h-3 w-full rounded animate-pulse" style={{ background: 'var(--color-separator)' }} />
+                <div className="h-3 w-3/4 rounded animate-pulse" style={{ background: 'var(--color-separator)' }} />
+                <div className="h-7 w-full rounded-lg animate-pulse mt-1" style={{ background: 'var(--color-separator)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-6">
-      <div className="grid grid-cols-3 gap-4 max-w-3xl">
-        {ARTIFACT_TYPES.map(({ type, label, icon }) => {
-          const artifact = getArtifact(type)
+    <div className="flex flex-col h-full overflow-y-auto">
+      <div className="px-6 pt-6 pb-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            AI-Powered Artifacts
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+            Generate useful content from your notebook
+          </p>
+        </div>
+        {loading[notebookId] && (
+          <Loader2 size={14} className="animate-spin" style={{ color: 'var(--color-text-tertiary)' }} />
+        )}
+      </div>
+
+      <div className="px-6 pb-6 pt-3 grid grid-cols-3 gap-3">
+        {ARTIFACT_TYPES.map((meta) => {
+          const artifact = getArtifact(meta.type)
           const status = artifact?.status ?? 'none'
           const progress = artifact?.progress ?? 0
 
           return (
             <ArtifactCard
-              key={type}
-              type={type}
-              label={label}
-              icon={icon}
+              key={meta.type}
+              meta={meta}
               status={status}
               progress={progress}
               artifactTitle={artifact?.title}
-              onGenerate={() => setModalType(type)}
-              onPreview={() => openCanvas(notebookId, type)}
-              onRegenerate={() => setModalType(type)}
+              onGenerate={() => setModalType(meta.type)}
+              onPreview={() => openCanvas(notebookId, meta.type)}
+              onRegenerate={() => setModalType(meta.type)}
             />
           )
         })}
       </div>
 
-      {/* Generation modal */}
-      <AnimatePresence>
+      <AP>
         {modalType && (
           <GenerateModal
             artifactType={modalType}
@@ -123,15 +220,15 @@ export function StudioPanel({ notebookId }: Props) {
             onGenerate={handleGenerate}
           />
         )}
-      </AnimatePresence>
+      </AP>
     </div>
   )
 }
 
+// ── Artifact Card ─────────────────────────────────────────────────────────────
+
 interface CardProps {
-  type: ArtifactType
-  label: string
-  icon: string
+  meta: ArtifactMeta
   status: 'none' | 'generating' | 'ready' | 'error'
   progress: number
   artifactTitle?: string
@@ -140,147 +237,154 @@ interface CardProps {
   onRegenerate: () => void
 }
 
-function ArtifactCard({ type, label, icon, status, progress, artifactTitle, onGenerate, onPreview, onRegenerate }: CardProps) {
-  const [hovered, setHovered] = useState(false)
+function ArtifactCard({ meta, status, progress, artifactTitle, onGenerate, onPreview, onRegenerate }: CardProps) {
+  const [imgError, setImgError] = useState(false)
+
+  const borderColor = status === 'generating'
+    ? 'rgba(0,122,255,0.35)'
+    : status === 'error'
+    ? 'var(--color-error)'
+    : 'var(--color-separator)'
 
   return (
-    <motion.div
-      className="relative rounded-xl overflow-hidden flex flex-col"
+    <div
+      className="flex flex-col rounded-2xl overflow-hidden"
       style={{
-        height: '160px',
-        background: status === 'none' ? 'var(--color-elevated)' : 'var(--color-elevated)',
-        border: status === 'generating'
-          ? '1.5px solid rgba(0,122,255,0.4)'
-          : status === 'error'
-          ? '1.5px solid var(--color-error)'
-          : '1.5px dashed var(--color-separator)',
-        borderRadius: '14px',
-        boxShadow: status === 'generating' ? '0 0 0 3px rgba(0,122,255,0.1)' : undefined,
+        background: 'var(--color-elevated)',
+        border: `1px solid ${borderColor}`,
+        boxShadow: status === 'generating' ? '0 0 0 3px rgba(0,122,255,0.08)' : 'var(--shadow-sm)',
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      whileHover={status !== 'generating' ? { scale: 1.02 } : {}}
-      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
     >
-      {status === 'none' && (
-        <div className="flex flex-col items-center justify-center h-full gap-2 p-3">
-          <span className="text-3xl">{icon}</span>
-          <span className="text-xs font-medium text-center" style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
-          <AnimatePresence>
-            {hovered && (
-              <motion.button
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                onClick={onGenerate}
-                className="px-3 py-1 rounded-lg text-xs font-medium border transition-colors"
-                style={{ borderColor: 'var(--color-separator)', color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--color-accent)'
-                  e.currentTarget.style.color = '#fff'
-                  e.currentTarget.style.borderColor = 'var(--color-accent)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = 'var(--color-text-secondary)'
-                  e.currentTarget.style.borderColor = 'var(--color-separator)'
-                }}
-              >
-                Generate
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {status === 'generating' && (
-        <div className="flex flex-col items-center justify-center h-full gap-3 p-3">
-          {/* Progress ring */}
-          <div className="relative w-12 h-12">
-            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
-              <circle cx="24" cy="24" r="20" fill="none" stroke="var(--color-separator)" strokeWidth="3" />
-              <circle
-                cx="24" cy="24" r="20" fill="none"
-                stroke="var(--color-accent)" strokeWidth="3"
-                strokeDasharray={`${2 * Math.PI * 20}`}
-                strokeDashoffset={`${2 * Math.PI * 20 * (1 - progress / 100)}`}
-                strokeLinecap="round"
-                style={{ transition: 'stroke-dashoffset 400ms ease' }}
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold" style={{ color: 'var(--color-accent)' }}>
-              {progress}%
+      {/* Thumbnail */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          height: 88,
+          background: 'var(--color-app-bg)',
+          borderBottom: '1px solid var(--color-separator)',
+        }}
+      >
+        {meta.thumbnail && !imgError ? (
+          <img
+            src={meta.thumbnail}
+            alt={meta.label}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover"
+            style={{ opacity: 0.85 }}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <span style={{ color: 'var(--color-text-tertiary)', opacity: 0.5 }}>
+              {/* scale up the icon for placeholder */}
+              {meta.icon}
             </span>
           </div>
-          <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Generating…</span>
-        </div>
-      )}
+        )}
 
-      {status === 'ready' && (
-        <>
-          {/* Thumbnail area */}
-          <div className="flex-1 flex items-center justify-center" style={{ background: 'var(--color-app-bg)' }}>
-            <span className="text-4xl">{icon}</span>
-          </div>
-          {/* Bottom bar */}
-          <div className="flex items-center justify-between px-3 py-2" style={{ borderTop: '1px solid var(--color-separator)' }}>
-            <div className="flex items-center gap-1 min-w-0">
-              <span className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
-                {artifactTitle && artifactTitle !== type ? artifactTitle : label}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button onClick={onPreview} className="p-1.5 rounded transition-colors" style={{ color: 'var(--color-accent)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-subtle)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                title="Preview">
-                <Play className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={onRegenerate} className="p-1.5 rounded transition-colors" style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                title="Regenerate">
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
+        {/* Generating overlay */}
+        {status === 'generating' && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center gap-1.5"
+            style={{ background: 'rgba(0,0,0,0.55)' }}
+          >
+            <Loader2 size={18} className="animate-spin text-white" />
+            <span className="text-xs font-semibold text-white">{progress}%</span>
+            <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.2)' }}>
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${progress}%`,
+                  background: 'var(--color-accent)',
+                  transition: 'width 400ms ease',
+                }}
+              />
             </div>
           </div>
-          {/* Hover overlay */}
-          <AnimatePresence>
-            {hovered && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3"
-                style={{ background: 'rgba(0,0,0,0.6)', borderRadius: '14px' }}
+        )}
+
+        {/* Ready badge */}
+        {status === 'ready' && (
+          <div
+            className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            style={{ background: 'rgba(52,199,89,0.15)', color: '#34C759' }}
+          >
+            Ready
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-col flex-1 p-3 gap-2">
+        {/* Title row */}
+        <div className="flex items-center gap-1.5">
+          <span style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}>{meta.icon}</span>
+          <span className="text-sm font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
+            {meta.label}
+          </span>
+        </div>
+
+        {/* Description */}
+        <p className="text-xs leading-snug" style={{ color: 'var(--color-text-secondary)' }}>
+          {meta.description}
+        </p>
+
+        {/* Action */}
+        <div className="mt-auto pt-1">
+          {status === 'none' && (
+            <button
+              onClick={onGenerate}
+              className="w-full rounded-lg py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-85"
+              style={{ background: 'var(--color-accent)' }}
+            >
+              Generate
+            </button>
+          )}
+
+          {status === 'generating' && (
+            <button
+              disabled
+              className="w-full rounded-lg py-1.5 text-xs font-semibold"
+              style={{ background: 'var(--color-accent-subtle)', color: 'var(--color-accent)', cursor: 'not-allowed' }}
+            >
+              Generating…
+            </button>
+          )}
+
+          {status === 'ready' && (
+            <div className="flex gap-1.5">
+              <button
+                onClick={onPreview}
+                className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-85"
+                style={{ background: 'var(--color-accent)' }}
               >
-                <button onClick={onPreview}
-                  className="w-full py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: 'var(--color-accent)', color: '#fff' }}>
-                  Preview
-                </button>
-                <button onClick={onRegenerate}
-                  className="w-full py-1.5 rounded-lg text-xs font-medium border"
-                  style={{ borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }}>
-                  Regenerate
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
-      )}
+                <Play size={11} />
+                Open
+              </button>
+              <button
+                onClick={onRegenerate}
+                className="flex items-center justify-center rounded-lg px-2.5 py-1.5 transition-colors"
+                style={{ background: 'var(--color-app-bg)', border: '1px solid var(--color-separator)', color: 'var(--color-text-secondary)' }}
+                title="Regenerate"
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+              >
+                <RefreshCw size={12} />
+              </button>
+            </div>
+          )}
 
-      {status === 'error' && (
-        <div className="flex flex-col items-center justify-center h-full gap-2 p-3">
-          <AlertCircle className="w-6 h-6" style={{ color: 'var(--color-error)' }} />
-          <span className="text-xs text-center" style={{ color: 'var(--color-error)' }}>Generation failed</span>
-          <button onClick={onGenerate}
-            className="px-3 py-1 rounded-lg text-xs font-medium border"
-            style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>
-            Retry
-          </button>
+          {status === 'error' && (
+            <button
+              onClick={onGenerate}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-colors"
+              style={{ background: 'rgba(255,69,58,0.1)', color: 'var(--color-error)' }}
+            >
+              <AlertCircle size={12} />
+              Retry
+            </button>
+          )}
         </div>
-      )}
-    </motion.div>
+      </div>
+    </div>
   )
 }

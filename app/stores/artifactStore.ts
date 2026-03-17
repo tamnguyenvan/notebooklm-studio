@@ -44,10 +44,14 @@ export const useArtifactStore = create<ArtifactStore>((set) => ({
   fetchArtifacts: async (notebookId, force = false) => {
     const s0 = useArtifactStore.getState()
     const last = s0.lastFetched[notebookId] ?? 0
-    // Skip if fresh AND no active tasks for this notebook (generating tasks need live data)
     const hasActiveTasks = s0.activeTasks.some((t) => t.notebookId === notebookId)
-    if (!force && !hasActiveTasks && Date.now() - last < STALE_MS && (s0.artifacts[notebookId]?.length ?? 0) > 0) return
-    set((s) => ({ loading: { ...s.loading, [notebookId]: true } }))
+    // Skip if fresh and no active tasks — use lastFetched regardless of array length
+    if (!force && !hasActiveTasks && Date.now() - last < STALE_MS) return
+    // Don't block UI — only set loading if we have no cached data at all
+    const hasCached = (s0.artifacts[notebookId]?.length ?? 0) > 0
+    if (!hasCached) {
+      set((s) => ({ loading: { ...s.loading, [notebookId]: true } }))
+    }
     try {
       const artifacts = await ipc.listArtifacts(notebookId)
       set((s) => {
