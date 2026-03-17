@@ -6,6 +6,9 @@ import { ChevronUp, ChevronDown, X, RefreshCw } from 'lucide-react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useToastStore } from '../../stores/toastStore'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
+
 const TYPE_ICONS: Record<string, string> = {
   audio: '🎙', video: '📹', slides: '📑', infographic: '🖼',
   quiz: '❓', flashcards: '🃏', report: '📄', data_table: '📊', mind_map: '🧠',
@@ -20,9 +23,13 @@ const TYPE_LABELS: Record<string, string> = {
 export function BackgroundTaskBar() {
   const { activeTasks, cancelTask } = useArtifactStore()
   const { show } = useToastStore()
-  const [collapsed, setCollapsed] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   if (activeTasks.length === 0) return null
+
+  const avgProgress = Math.round(
+    activeTasks.reduce((sum, t) => sum + t.progress, 0) / activeTasks.length
+  )
 
   const handleCancel = async (taskId: string) => {
     try {
@@ -34,44 +41,54 @@ export function BackgroundTaskBar() {
   }
 
   return (
-    <motion.div
-      initial={{ y: '100%' }}
-      animate={{ y: 0 }}
-      exit={{ y: '100%' }}
-      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-      className="fixed bottom-0 left-0 right-0 z-40 border-t"
+    <div
+      className="border-t shrink-0"
       style={{
         background: 'var(--color-elevated)',
         borderColor: 'var(--color-separator)',
-        boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
+        boxShadow: '0 -2px 12px rgba(0,0,0,0.08)',
       }}
     >
-      {/* Header row */}
+      {/* Collapsed header row — always visible */}
       <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="flex w-full items-center gap-2 px-4 py-2.5 transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-2.5 px-4 py-2.5 transition-colors"
         onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
       >
-        <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--color-accent)' }} />
-        <span className="flex-1 text-xs font-medium text-left" style={{ color: 'var(--color-text-primary)' }}>
+        <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: 'var(--color-accent)' }} />
+        <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
           {activeTasks.length} task{activeTasks.length > 1 ? 's' : ''} running
         </span>
-        {collapsed ? <ChevronUp className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} />
-                   : <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} />}
+
+        {/* Mini progress bar */}
+        <div className="flex-1 h-1 rounded-full overflow-hidden mx-1" style={{ background: 'var(--color-separator)' }}>
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${avgProgress}%`, background: 'var(--color-accent)' }}
+          />
+        </div>
+
+        <span className="text-xs shrink-0" style={{ color: 'var(--color-text-secondary)' }}>
+          {avgProgress}%
+        </span>
+
+        {expanded
+          ? <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
+          : <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-secondary)' }} />}
       </button>
 
-      {/* Task list */}
-      <AnimatePresence>
-        {!collapsed && (
+      {/* Expanded task list */}
+      <AP>
+        {expanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
-            <div className="flex flex-col gap-1 px-4 pb-3">
+            <div className="flex flex-col gap-1.5 px-4 pb-3">
               {activeTasks.map((task) => (
                 <div key={task.taskId} className="flex items-center gap-3">
                   <span className="text-base w-5 shrink-0">{TYPE_ICONS[task.artifactType] ?? '⚙'}</span>
@@ -79,15 +96,10 @@ export function BackgroundTaskBar() {
                     {TYPE_LABELS[task.artifactType] ?? task.artifactType}
                   </span>
 
-                  {/* Progress bar */}
                   <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-separator)' }}>
                     <div
                       className="h-full rounded-full"
-                      style={{
-                        width: `${task.progress}%`,
-                        background: 'var(--color-accent)',
-                        transition: 'width 400ms ease',
-                      }}
+                      style={{ width: `${task.progress}%`, background: 'var(--color-accent)', transition: 'width 400ms ease' }}
                     />
                   </div>
 
@@ -110,7 +122,7 @@ export function BackgroundTaskBar() {
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
-    </motion.div>
+      </AP>
+    </div>
   )
 }

@@ -2,8 +2,11 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
 import { X } from 'lucide-react'
 import { ArtifactType, GenerateConfig } from '../../lib/ipc'
+import { Select } from '../ui/Dropdown'
 
 interface Props {
   artifactType: ArtifactType
@@ -82,11 +85,13 @@ function AudioForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) =>
         />
       </Field>
       <Field label="Language">
-        <select value={language} onChange={(e) => setLanguage(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border text-sm"
-          style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }}>
-          {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
-        </select>
+        <Select
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+          value={language}
+          onChange={setLanguage}
+          triggerClassName="w-full"
+          triggerStyle={{ justifyContent: 'space-between' }}
+        />
       </Field>
       <Field label="Instructions (optional)">
         <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)}
@@ -283,15 +288,19 @@ function ModalShell({
   children: React.ReactNode
 }) {
   return (
-    <div
+    <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+      style={{ backdropFilter: 'blur(4px)' }}
+      initial={{ background: 'rgba(0,0,0,0)' }}
+      animate={{ background: 'rgba(0,0,0,0.4)' }}
+      exit={{ background: 'rgba(0,0,0,0)' }}
+      transition={{ duration: 0.15 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
+        initial={{ y: 8, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 8, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 35 }}
         className="flex flex-col rounded-xl overflow-hidden"
         style={{
@@ -329,14 +338,14 @@ function ModalShell({
           </button>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   )
 }
 
 export function GenerateModal({ artifactType, onClose, onGenerate }: Props) {
   const props = { onGenerate, onClose }
   return (
-    <AnimatePresence>
+    <AP>
       {(() => {
         switch (artifactType) {
           case 'audio':       return <AudioForm {...props} />
@@ -351,6 +360,6 @@ export function GenerateModal({ artifactType, onClose, onGenerate }: Props) {
           default:            return null
         }
       })()}
-    </AnimatePresence>
+    </AP>
   )
 }

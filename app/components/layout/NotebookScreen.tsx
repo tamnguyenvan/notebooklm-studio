@@ -192,30 +192,33 @@ export function NotebookScreen({ notebookId }: Props) {
       </div>
 
       {/* Main area: tab content + canvas panel side by side */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Tab content — all panels stay mounted; only active one is visible */}
-        <div className="flex-1 overflow-hidden relative">
-          {TABS.map((tab) => (
-            <div
-              key={tab.id}
-              className="absolute inset-0 h-full"
-              style={{ display: activeTab === tab.id ? 'flex' : 'none', flexDirection: 'column' }}
-            >
-              {tab.id === 'chat'     && <ChatPanel notebookId={notebookId} />}
-              {tab.id === 'sources'  && <SourcesPanel notebookId={notebookId} />}
-              {tab.id === 'studio'   && <StudioPanel notebookId={notebookId} />}
-              {tab.id === 'research' && <ResearchPanel notebookId={notebookId} />}
-              {tab.id === 'notes'    && <NotesPanel notebookId={notebookId} />}
-            </div>
-          ))}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Right column: tab content + task bar */}
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+          {/* Tab content — all panels stay mounted; only active one is visible */}
+          <div className="flex-1 overflow-hidden relative">
+            {TABS.map((tab) => (
+              <div
+                key={tab.id}
+                className="absolute inset-0 h-full"
+                style={{ display: activeTab === tab.id ? 'flex' : 'none', flexDirection: 'column' }}
+              >
+                {tab.id === 'chat'     && <ChatPanel notebookId={notebookId} />}
+                {tab.id === 'sources'  && <SourcesPanel notebookId={notebookId} />}
+                {tab.id === 'studio'   && <StudioPanel notebookId={notebookId} />}
+                {tab.id === 'research' && <ResearchPanel notebookId={notebookId} />}
+                {tab.id === 'notes'    && <NotesPanel notebookId={notebookId} />}
+              </div>
+            ))}
+          </div>
+
+          {/* Background task bar — scoped to right content area */}
+          <BackgroundTaskBar />
         </div>
 
         {/* Canvas panel */}
         <CanvasPanel />
       </div>
-
-      {/* Background task bar */}
-      <BackgroundTaskBar />
 
       {/* Share modal */}
       <AP>
