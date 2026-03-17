@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { NotebookCard } from './NotebookCard'
 import { NewNotebookModal } from './NewNotebookModal'
@@ -49,31 +48,18 @@ export function NotebookList() {
         )}
 
         {notebooks.length > 0 && (
-          <motion.div
+          <div
             className="grid gap-4"
             style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: {},
-              visible: { transition: { staggerChildren: 0.04 } },
-            }}
           >
             {notebooks.map((nb) => (
-              <motion.div
+              <NotebookCard
                 key={nb.id}
-                variants={{
-                  hidden: { opacity: 0, y: 12 },
-                  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 500, damping: 35 } },
-                }}
-              >
-                <NotebookCard
-                  notebook={nb}
-                  onClick={() => setActiveNotebook(nb.id)}
-                />
-              </motion.div>
+                notebook={nb}
+                onClick={() => setActiveNotebook(nb.id)}
+              />
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
 

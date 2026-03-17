@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { MoreHorizontal, Pin, PinOff, Trash2, Pencil, Share2 } from 'lucide-react'
 import { Notebook } from '../../lib/ipc'
 import { useNotebookStore } from '../../stores/notebookStore'
+import { useSourceStore } from '../../stores/sourceStore'
 import { useToastStore } from '../../stores/toastStore'
 import { ShareModal } from '../sharing/ShareModal'
 
@@ -29,6 +29,15 @@ interface Props {
 export function NotebookCard({ notebook, onClick }: Props) {
   const { renameNotebook, deleteNotebook, pinNotebook, fetchNotebooks } = useNotebookStore()
   const { show } = useToastStore()
+  const { sources, fetchSources } = useSourceStore()
+  const sourceCount = sources[notebook.id]?.length ?? notebook.source_count
+
+  // Lazy-load source count if not yet in store
+  useEffect(() => {
+    if (sources[notebook.id] === undefined) {
+      fetchSources(notebook.id)
+    }
+  }, [notebook.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(notebook.title)
@@ -91,10 +100,8 @@ export function NotebookCard({ notebook, onClick }: Props) {
 
   return (
     <>
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-      className="relative flex h-[140px] cursor-pointer flex-col rounded-2xl p-4"
+    <div
+      className="relative flex h-[140px] cursor-pointer flex-col rounded-2xl p-4 transition-shadow"
       style={{
         background: 'var(--color-elevated)',
         boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)',
@@ -151,7 +158,7 @@ export function NotebookCard({ notebook, onClick }: Props) {
 
       {/* Meta */}
       <p className="mt-auto text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-        {notebook.source_count} source{notebook.source_count !== 1 ? 's' : ''}
+        {sourceCount} source{sourceCount !== 1 ? 's' : ''}
         {notebook.updated_at ? ` · ${timeAgo(notebook.updated_at)}` : ''}
       </p>
 
@@ -203,7 +210,7 @@ export function NotebookCard({ notebook, onClick }: Props) {
           </div>
         </div>
       )}
-    </motion.div>
+    </div>
     {shareOpen && (
       <ShareModal
         notebookId={notebook.id}
