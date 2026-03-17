@@ -22,10 +22,11 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 interface Props {
   notebookId: string
   onClose: () => void
+  initialTab?: Tab
 }
 
-export function AddSourceModal({ notebookId, onClose }: Props) {
-  const [tab, setTab] = useState<Tab>('url')
+export function AddSourceModal({ notebookId, onClose, initialTab }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'url')
   const [url, setUrl] = useState('')
   const [ytUrl, setYtUrl] = useState('')
   const [driveUrl, setDriveUrl] = useState('')

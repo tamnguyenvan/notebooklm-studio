@@ -15,9 +15,11 @@ import { ResearchPanel } from '../research/ResearchPanel'
 import { NotesPanel } from '../notes/NotesPanel'
 import { ShareModal } from '../sharing/ShareModal'
 import { AddSourceModal } from '../sources/AddSourceModal'
+import { GenerateModal } from '../studio/GenerateModal'
 import { ws } from '../../lib/ws'
 import { useShortcut } from '../../lib/useShortcut'
 import { useArtifactStore } from '../../stores/artifactStore'
+import { ArtifactType, GenerateConfig } from '../../lib/ipc'
 
 type TabId = 'chat' | 'sources' | 'studio' | 'research' | 'notes'
 
@@ -35,10 +37,12 @@ interface Props {
 
 export function NotebookScreen({ notebookId }: Props) {
   const { notebooks, setActiveNotebook, renameNotebook } = useNotebookStore()
-  const { closeCanvas, canvasItem } = useArtifactStore()
+  const { closeCanvas, canvasItem, generate } = useArtifactStore()
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [shareOpen, setShareOpen] = useState(false)
   const [addSourceOpen, setAddSourceOpen] = useState(false)
+  const [addSourceType, setAddSourceType] = useState<'url' | 'youtube' | 'file' | 'text' | 'gdrive' | null>(null)
+  const [generateType, setGenerateType] = useState<ArtifactType | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const nb = notebooks.find((n) => n.id === notebookId)
@@ -46,6 +50,36 @@ export function NotebookScreen({ notebookId }: Props) {
   // Connect WS once when notebook screen mounts
   useEffect(() => {
     ws.connect(8008)
+  }, [])
+
+  // Listen for palette events
+  useEffect(() => {
+    const onAddSource = (e: Event) => {
+      const type = (e as CustomEvent).detail as 'url' | 'youtube' | 'file' | 'text' | 'gdrive'
+      setAddSourceType(type)
+      setAddSourceOpen(true)
+    }
+    const onGenerate = (e: Event) => {
+      setGenerateType((e as CustomEvent).detail as ArtifactType)
+    }
+    const onSwitchTab = (e: Event) => {
+      setActiveTab((e as CustomEvent).detail as TabId)
+    }
+    const onNewNote = () => {
+      setActiveTab('notes')
+      // Small delay so NotesPanel is visible before it triggers new note
+      setTimeout(() => window.dispatchEvent(new CustomEvent('notes:new_note')), 50)
+    }
+    window.addEventListener('palette:add_source', onAddSource)
+    window.addEventListener('palette:generate', onGenerate)
+    window.addEventListener('palette:switch_tab', onSwitchTab)
+    window.addEventListener('palette:new_note', onNewNote)
+    return () => {
+      window.removeEventListener('palette:add_source', onAddSource)
+      window.removeEventListener('palette:generate', onGenerate)
+      window.removeEventListener('palette:switch_tab', onSwitchTab)
+      window.removeEventListener('palette:new_note', onNewNote)
+    }
   }, [])
 
   // Tab shortcuts
@@ -56,7 +90,7 @@ export function NotebookScreen({ notebookId }: Props) {
   useShortcut('tab_notes',    useCallback(() => setActiveTab('notes'),    []))
 
   // Add source shortcut
-  useShortcut('add_source', useCallback(() => setAddSourceOpen(true), []))
+  useShortcut('add_source', useCallback(() => { setAddSourceType(null); setAddSourceOpen(true) }, []))
 
   // Rename shortcut (F2)
   useShortcut('rename', useCallback(() => {
@@ -194,12 +228,27 @@ export function NotebookScreen({ notebookId }: Props) {
         )}
       </AP>
 
-      {/* Add Source modal (triggered by Ctrl+Shift+S) */}
+      {/* Add Source modal (triggered by Ctrl+Shift+S or palette) */}
       <AP>
         {addSourceOpen && (
           <AddSourceModal
             notebookId={notebookId}
-            onClose={() => setAddSourceOpen(false)}
+            initialTab={addSourceType ?? undefined}
+            onClose={() => { setAddSourceOpen(false); setAddSourceType(null) }}
+          />
+        )}
+      </AP>
+
+      {/* Generate modal (triggered by palette) */}
+      <AP>
+        {generateType && (
+          <GenerateModal
+            artifactType={generateType}
+            onClose={() => setGenerateType(null)}
+            onGenerate={async (config: GenerateConfig) => {
+              setGenerateType(null)
+              try { await generate(notebookId, config) } catch { /* StudioPanel handles errors */ }
+            }}
           />
         )}
       </AP>
