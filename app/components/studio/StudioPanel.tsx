@@ -342,7 +342,6 @@ function ArtifactCard({ meta, status, progress, taskId, onGenerate, onPreview, o
                 className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-85"
                 style={{ background: 'var(--color-accent)' }}
               >
-                <Play size={11} />
                 Open
               </button>
               <button
