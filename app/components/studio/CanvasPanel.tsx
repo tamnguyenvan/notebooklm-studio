@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight, Maximize2, Download } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { ArtifactType } from '../../lib/ipc'
 import { AudioViewer } from './viewers/AudioViewer'
@@ -19,6 +19,7 @@ import { useToastStore } from '../../stores/toastStore'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { useDownloadStore } from '../../stores/downloadStore'
 import { ipc } from '../../lib/ipc'
+import { useShortcut } from '../../lib/useShortcut'
 
 const ARTIFACT_LABELS: Record<ArtifactType, string> = {
   audio: 'Audio Overview',
@@ -51,6 +52,19 @@ export function CanvasPanel() {
   const { addDownload } = useDownloadStore()
   const [expanded, setExpanded] = useState(false)
   const [showFormats, setShowFormats] = useState(false)
+
+  // Canvas shortcuts — only active when canvas is open
+  const dispatchCanvasAction = useCallback((action: string) => {
+    window.dispatchEvent(new CustomEvent('canvas:action', { detail: action }))
+  }, [])
+
+  useShortcut('canvas_close', useCallback(() => { if (canvasItem) closeCanvas() }, [canvasItem, closeCanvas]))
+  useShortcut('canvas_play',  useCallback(() => dispatchCanvasAction('play'),  [dispatchCanvasAction]))
+  useShortcut('canvas_back',  useCallback(() => dispatchCanvasAction('back'),  [dispatchCanvasAction]))
+  useShortcut('canvas_fwd',   useCallback(() => dispatchCanvasAction('fwd'),   [dispatchCanvasAction]))
+  useShortcut('zoom_in',      useCallback(() => dispatchCanvasAction('zoom_in'),    [dispatchCanvasAction]))
+  useShortcut('zoom_out',     useCallback(() => dispatchCanvasAction('zoom_out'),   [dispatchCanvasAction]))
+  useShortcut('zoom_reset',   useCallback(() => dispatchCanvasAction('zoom_reset'), [dispatchCanvasAction]))
 
   const handleDownload = async (format: { label: string; ext: string; format: string }) => {
     if (!canvasItem) return

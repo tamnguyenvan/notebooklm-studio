@@ -1,20 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Palette, Download, User, Info, FolderOpen } from 'lucide-react'
+import { Palette, Download, User, Info, FolderOpen, Keyboard } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuthStore } from '../../stores/authStore'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { ShortcutsTab } from './ShortcutsTab'
 
-type Tab = 'appearance' | 'downloads' | 'account' | 'about'
+type Tab = 'appearance' | 'downloads' | 'shortcuts' | 'account' | 'about'
 type Theme = 'light' | 'dark' | 'system'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'appearance', label: 'Appearance', icon: <Palette size={15} /> },
-  { id: 'downloads', label: 'Downloads', icon: <Download size={15} /> },
-  { id: 'account', label: 'Account', icon: <User size={15} /> },
-  { id: 'about', label: 'About', icon: <Info size={15} /> },
+  { id: 'downloads',  label: 'Downloads',  icon: <Download size={15} /> },
+  { id: 'shortcuts',  label: 'Shortcuts',  icon: <Keyboard size={15} /> },
+  { id: 'account',    label: 'Account',    icon: <User size={15} /> },
+  { id: 'about',      label: 'About',      icon: <Info size={15} /> },
 ]
 
 export function SettingsScreen() {
@@ -100,6 +102,7 @@ export function SettingsScreen() {
         >
           {tab === 'appearance' && <AppearanceTab theme={theme} onThemeChange={applyTheme} />}
           {tab === 'downloads' && <DownloadsTab folder={downloadFolder} onPickFolder={pickFolder} />}
+          {tab === 'shortcuts' && <ShortcutsTab />}
           {tab === 'account' && <AccountTab account={account} onLogout={logout} />}
           {tab === 'about' && <AboutTab />}
         </motion.div>

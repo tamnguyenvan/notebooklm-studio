@@ -11,6 +11,7 @@ import { useSourceStore } from '../../stores/sourceStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { ChatMessage, ChatReference } from '../../lib/ipc'
+import { useShortcut } from '../../lib/useShortcut'
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
 
@@ -398,6 +399,9 @@ export function ChatPanel({ notebookId }: { notebookId: string }) {
     setInput('')
     await sendMessage(notebookId, text)
   }, [input, isLoading, notebookId, sendMessage])
+
+  // Register send_message shortcut (Ctrl/Cmd+Enter)
+  useShortcut('send_message', useCallback(() => handleSend(), [handleSend]))
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.key === 'Enter' && !e.shiftKey) || (e.key === 'Enter' && e.metaKey)) {

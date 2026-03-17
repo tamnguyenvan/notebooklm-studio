@@ -1,14 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { NotebookCard } from './NotebookCard'
-import { NewNotebookModal } from './NewNotebookModal'
 
-export function NotebookList() {
+export function NotebookList({ onNewNotebook }: { onNewNotebook?: () => void }) {
   const { notebooks, loading, error, fetchNotebooks, setActiveNotebook } = useNotebookStore()
-  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     fetchNotebooks()
@@ -44,7 +42,7 @@ export function NotebookList() {
         )}
 
         {!loading && notebooks.length === 0 && !error && (
-          <EmptyState onNew={() => setModalOpen(true)} />
+          <EmptyState onNew={() => onNewNotebook?.()} />
         )}
 
         {notebooks.length > 0 && (
@@ -62,8 +60,6 @@ export function NotebookList() {
           </div>
         )}
       </div>
-
-      <NewNotebookModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
   )
 }

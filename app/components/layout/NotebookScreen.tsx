@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
 import { MessageSquare, BookOpen, Wand2, Search, StickyNote, ChevronLeft, Share2 } from 'lucide-react'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { SourcesPanel } from '../sources/SourcesPanel'
@@ -12,7 +14,10 @@ import { BackgroundTaskBar } from '../studio/BackgroundTaskBar'
 import { ResearchPanel } from '../research/ResearchPanel'
 import { NotesPanel } from '../notes/NotesPanel'
 import { ShareModal } from '../sharing/ShareModal'
+import { AddSourceModal } from '../sources/AddSourceModal'
 import { ws } from '../../lib/ws'
+import { useShortcut } from '../../lib/useShortcut'
+import { useArtifactStore } from '../../stores/artifactStore'
 
 type TabId = 'chat' | 'sources' | 'studio' | 'research' | 'notes'
 
@@ -29,15 +34,49 @@ interface Props {
 }
 
 export function NotebookScreen({ notebookId }: Props) {
-  const { notebooks, setActiveNotebook } = useNotebookStore()
+  const { notebooks, setActiveNotebook, renameNotebook } = useNotebookStore()
+  const { closeCanvas, canvasItem } = useArtifactStore()
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [shareOpen, setShareOpen] = useState(false)
+  const [addSourceOpen, setAddSourceOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
   const nb = notebooks.find((n) => n.id === notebookId)
 
   // Connect WS once when notebook screen mounts
   useEffect(() => {
     ws.connect(8008)
   }, [])
+
+  // Tab shortcuts
+  useShortcut('tab_chat',     useCallback(() => setActiveTab('chat'),     []))
+  useShortcut('tab_sources',  useCallback(() => setActiveTab('sources'),  []))
+  useShortcut('tab_studio',   useCallback(() => setActiveTab('studio'),   []))
+  useShortcut('tab_research', useCallback(() => setActiveTab('research'), []))
+  useShortcut('tab_notes',    useCallback(() => setActiveTab('notes'),    []))
+
+  // Add source shortcut
+  useShortcut('add_source', useCallback(() => setAddSourceOpen(true), []))
+
+  // Rename shortcut (F2)
+  useShortcut('rename', useCallback(() => {
+    if (!nb) return
+    setRenameValue(nb.title)
+    setRenaming(true)
+  }, [nb]))
+
+  // Toggle canvas shortcut
+  useShortcut('toggle_canvas', useCallback(() => {
+    if (canvasItem) closeCanvas()
+  }, [canvasItem, closeCanvas]))
+
+  const handleRenameSubmit = async () => {
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== nb?.title) {
+      await renameNotebook(notebookId, trimmed)
+    }
+    setRenaming(false)
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -57,12 +96,34 @@ export function NotebookScreen({ notebookId }: Props) {
           <ChevronLeft className="w-4 h-4" />
         </button>
         <span className="text-xl">{nb?.emoji ?? '📓'}</span>
-        <h1
-          className="text-base font-semibold truncate flex-1"
-          style={{ color: 'var(--color-text-primary)' }}
-        >
-          {nb?.title ?? 'Notebook'}
-        </h1>
+
+        {renaming ? (
+          <input
+            autoFocus
+            className="flex-1 text-base font-semibold bg-transparent outline-none rounded px-1"
+            style={{
+              color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-accent)',
+            }}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onBlur={handleRenameSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameSubmit()
+              if (e.key === 'Escape') setRenaming(false)
+            }}
+          />
+        ) : (
+          <h1
+            className="text-base font-semibold truncate flex-1"
+            style={{ color: 'var(--color-text-primary)', cursor: 'default' }}
+            onDoubleClick={() => { setRenameValue(nb?.title ?? ''); setRenaming(true) }}
+            title="Double-click or press F2 to rename"
+          >
+            {nb?.title ?? 'Notebook'}
+          </h1>
+        )}
+
         <button
           onClick={() => setShareOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
@@ -123,7 +184,7 @@ export function NotebookScreen({ notebookId }: Props) {
       <BackgroundTaskBar />
 
       {/* Share modal */}
-      <AnimatePresence>
+      <AP>
         {shareOpen && nb && (
           <ShareModal
             notebookId={notebookId}
@@ -131,7 +192,17 @@ export function NotebookScreen({ notebookId }: Props) {
             onClose={() => setShareOpen(false)}
           />
         )}
-      </AnimatePresence>
+      </AP>
+
+      {/* Add Source modal (triggered by Ctrl+Shift+S) */}
+      <AP>
+        {addSourceOpen && (
+          <AddSourceModal
+            notebookId={notebookId}
+            onClose={() => setAddSourceOpen(false)}
+          />
+        )}
+      </AP>
     </div>
   )
 }
