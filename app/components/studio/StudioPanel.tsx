@@ -7,13 +7,18 @@ const AP = AnimatePresence as any
 import {
   Mic, Video, Presentation, HelpCircle, CreditCard,
   Image, FileText, Table, GitBranch,
-  Play, RefreshCw, AlertCircle, Loader2,
+  Play, RefreshCw, AlertCircle, Loader2, Download, X,
 } from 'lucide-react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useToastStore } from '../../stores/toastStore'
+import { useNotebookStore } from '../../stores/notebookStore'
+import { useDownloadStore } from '../../stores/downloadStore'
 import { ws } from '../../lib/ws'
 import { ArtifactType, Artifact, GenerateConfig } from '../../lib/ipc'
+import { ipc } from '../../lib/ipc'
 import { GenerateModal } from './GenerateModal'
+
+const GENERATING_TIMEOUT_MS = 20 * 60 * 1000 // 20 min
 
 interface Props {
   notebookId: string
@@ -28,81 +33,60 @@ interface ArtifactMeta {
 }
 
 const ARTIFACT_TYPES: ArtifactMeta[] = [
-  {
-    type: 'audio',
-    label: 'Audio Overview',
-    description: 'Summarize your notes into an audio podcast',
-    icon: <Mic size={16} />,
-    thumbnail: '/thumbnails/audio.webp',
-  },
-  {
-    type: 'video',
-    label: 'Video Summary',
-    description: 'Generate a video summary of your notebook',
-    icon: <Video size={16} />,
-    thumbnail: '/thumbnails/video.webp',
-  },
-  {
-    type: 'slides',
-    label: 'Slides',
-    description: 'Create a slide deck from your notes',
-    icon: <Presentation size={16} />,
-    thumbnail: '/thumbnails/slides.webp',
-  },
-  {
-    type: 'quiz',
-    label: 'Quiz',
-    description: 'Generate quiz questions to test knowledge',
-    icon: <HelpCircle size={16} />,
-    thumbnail: '/thumbnails/quiz.webp',
-  },
-  {
-    type: 'flashcards',
-    label: 'Flashcards',
-    description: 'Create flashcards for studying',
-    icon: <CreditCard size={16} />,
-    thumbnail: '/thumbnails/flashcards.webp',
-  },
-  {
-    type: 'infographic',
-    label: 'Infographic',
-    description: 'Generate a visual infographic',
-    icon: <Image size={16} />,
-    thumbnail: '/thumbnails/infographic.webp',
-  },
-  {
-    type: 'report',
-    label: 'Report',
-    description: 'Generate a detailed report',
-    icon: <FileText size={16} />,
-    thumbnail: '/thumbnails/report.webp',
-  },
-  {
-    type: 'data_table',
-    label: 'Data Table',
-    description: 'Extract structured data from sources',
-    icon: <Table size={16} />,
-    thumbnail: '/thumbnails/data_table.webp',
-  },
-  {
-    type: 'mind_map',
-    label: 'Mind Map',
-    description: 'Generate a visual mind map',
-    icon: <GitBranch size={16} />,
-    thumbnail: '/thumbnails/mind_map.webp',
-  },
+  { type: 'audio',      label: 'Audio Overview', description: 'Summarize your notes into an audio podcast',   icon: <Mic size={16} />,          thumbnail: '/thumbnails/audio.webp' },
+  { type: 'video',      label: 'Video Summary',  description: 'Generate a video summary of your notebook',    icon: <Video size={16} />,         thumbnail: '/thumbnails/video.webp' },
+  { type: 'slides',     label: 'Slides',         description: 'Create a slide deck from your notes',          icon: <Presentation size={16} />,  thumbnail: '/thumbnails/slides.webp' },
+  { type: 'quiz',       label: 'Quiz',           description: 'Generate quiz questions to test knowledge',     icon: <HelpCircle size={16} />,    thumbnail: '/thumbnails/quiz.webp' },
+  { type: 'flashcards', label: 'Flashcards',     description: 'Create flashcards for studying',               icon: <CreditCard size={16} />,    thumbnail: '/thumbnails/flashcards.webp' },
+  { type: 'infographic',label: 'Infographic',    description: 'Generate a visual infographic',                icon: <Image size={16} />,         thumbnail: '/thumbnails/infographic.webp' },
+  { type: 'report',     label: 'Report',         description: 'Generate a detailed report',                   icon: <FileText size={16} />,      thumbnail: '/thumbnails/report.webp' },
+  { type: 'data_table', label: 'Data Table',     description: 'Extract structured data from sources',         icon: <Table size={16} />,         thumbnail: '/thumbnails/data_table.webp' },
+  { type: 'mind_map',   label: 'Mind Map',       description: 'Generate a visual mind map',                   icon: <GitBranch size={16} />,     thumbnail: '/thumbnails/mind_map.webp' },
 ]
 
+const DOWNLOAD_FORMATS: Record<ArtifactType, { label: string; ext: string; format: string }[]> = {
+  audio:       [{ label: 'MP4', ext: 'mp4', format: 'mp4' }],
+  video:       [{ label: 'MP4', ext: 'mp4', format: 'mp4' }],
+  slides:      [{ label: 'PDF', ext: 'pdf', format: 'pdf' }],
+  infographic: [{ label: 'PNG', ext: 'png', format: 'png' }],
+  quiz:        [{ label: 'JSON', ext: 'json', format: 'json' }, { label: 'Markdown', ext: 'md', format: 'markdown' }],
+  flashcards:  [{ label: 'JSON', ext: 'json', format: 'json' }, { label: 'Markdown', ext: 'md', format: 'markdown' }],
+  report:      [{ label: 'Markdown', ext: 'md', format: 'markdown' }],
+  data_table:  [{ label: 'CSV', ext: 'csv', format: 'csv' }],
+  mind_map:    [{ label: 'JSON', ext: 'json', format: 'json' }],
+}
+
 export function StudioPanel({ notebookId }: Props) {
-  const { artifacts, loading, fetchArtifacts, generate, onTaskProgress, onTaskComplete, onTaskError, openCanvas } = useArtifactStore()
+  const { artifacts, loading, activeTasks, fetchArtifacts, generate, cancelTask, onTaskProgress, onTaskComplete, onTaskError, openCanvas } = useArtifactStore()
   const { show } = useToastStore()
+  const { notebooks } = useNotebookStore()
+  const { addDownload } = useDownloadStore()
   const [modalType, setModalType] = useState<ArtifactType | null>(null)
+  // Track when each task started (for timeout detection)
+  const [taskStartTimes] = useState<Map<string, number>>(new Map())
 
   const notebookArtifacts = artifacts[notebookId] ?? []
 
   useEffect(() => {
     fetchArtifacts(notebookId)
   }, [notebookId])
+
+  // Timeout watchdog — mark stuck tasks as error after 5 min
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now()
+      activeTasks.forEach((task) => {
+        if (task.notebookId !== notebookId) return
+        const started = taskStartTimes.get(task.taskId)
+        if (!started) { taskStartTimes.set(task.taskId, now); return }
+        if (now - started > GENERATING_TIMEOUT_MS) {
+          onTaskError(task.taskId, notebookId, 'Generation timed out')
+          show({ type: 'error', message: `${task.artifactType.replace('_', ' ')} generation timed out` })
+        }
+      })
+    }, 10_000)
+    return () => clearInterval(interval)
+  }, [activeTasks, notebookId])
 
   useEffect(() => {
     const unsubs = [
@@ -135,9 +119,43 @@ export function StudioPanel({ notebookId }: Props) {
   const handleGenerate = async (config: GenerateConfig) => {
     setModalType(null)
     try {
-      await generate(notebookId, config)
+      const taskId = await generate(notebookId, config)
+      taskStartTimes.set(taskId, Date.now())
     } catch (e) {
       show({ type: 'error', message: `Failed to start generation: ${String(e)}` })
+    }
+  }
+
+  const handleCancel = async (type: ArtifactType) => {
+    const task = activeTasks.find((t) => t.notebookId === notebookId && t.artifactType === type)
+    if (!task) return
+    try {
+      await cancelTask(task.taskId)
+      show({ type: 'info', message: `${type.replace('_', ' ')} generation cancelled` })
+    } catch {
+      show({ type: 'error', message: 'Failed to cancel task' })
+    }
+  }
+
+  const handleDownload = async (type: ArtifactType) => {
+    const formats = DOWNLOAD_FORMATS[type]
+    const fmt = formats[0] // single format — multi-format handled in canvas footer
+    const label = ARTIFACT_TYPES.find((a) => a.type === type)?.label ?? type
+    const filename = `${label.replace(/\s+/g, '_')}.${fmt.ext}`
+    try {
+      const destPath = await ipc.openSaveDialog(filename, [{ name: fmt.label, extensions: [fmt.ext] }])
+      if (!destPath) return
+      await ipc.downloadArtifact(notebookId, type, destPath, fmt.format)
+      const notebookTitle = notebooks.find((n) => n.id === notebookId)?.title ?? ''
+      try {
+        const record = await ipc.recordDownload(notebookId, notebookTitle, type, fmt.format, destPath)
+        addDownload(record)
+        show({ type: 'success', message: `Saved ${filename}`, undoLabel: 'Show in Finder', onUndo: () => ipc.revealDownload(record.id).catch(() => {}), duration: 6000 })
+      } catch {
+        show({ type: 'success', message: `Saved ${filename}` })
+      }
+    } catch (e) {
+      show({ type: 'error', message: `Download failed: ${String(e)}` })
     }
   }
 
@@ -153,11 +171,7 @@ export function StudioPanel({ notebookId }: Props) {
         </div>
         <div className="px-6 pb-6 pt-3 grid grid-cols-3 gap-3">
           {Array.from({ length: 9 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-2xl overflow-hidden"
-              style={{ border: '1px solid var(--color-separator)', background: 'var(--color-elevated)' }}
-            >
+            <div key={i} className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-separator)', background: 'var(--color-elevated)' }}>
               <div className="animate-pulse" style={{ height: 88, background: 'var(--color-separator)' }} />
               <div className="p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
@@ -196,6 +210,7 @@ export function StudioPanel({ notebookId }: Props) {
           const artifact = getArtifact(meta.type)
           const status = artifact?.status ?? 'none'
           const progress = artifact?.progress ?? 0
+          const taskId = activeTasks.find((t) => t.notebookId === notebookId && t.artifactType === meta.type)?.taskId
 
           return (
             <ArtifactCard
@@ -203,10 +218,12 @@ export function StudioPanel({ notebookId }: Props) {
               meta={meta}
               status={status}
               progress={progress}
-              artifactTitle={artifact?.title}
+              taskId={taskId}
               onGenerate={() => setModalType(meta.type)}
               onPreview={() => openCanvas(notebookId, meta.type)}
               onRegenerate={() => setModalType(meta.type)}
+              onCancel={() => handleCancel(meta.type)}
+              onDownload={() => handleDownload(meta.type)}
             />
           )
         })}
@@ -231,13 +248,15 @@ interface CardProps {
   meta: ArtifactMeta
   status: 'none' | 'generating' | 'ready' | 'error'
   progress: number
-  artifactTitle?: string
+  taskId?: string
   onGenerate: () => void
   onPreview: () => void
   onRegenerate: () => void
+  onCancel: () => void
+  onDownload: () => void
 }
 
-function ArtifactCard({ meta, status, progress, artifactTitle, onGenerate, onPreview, onRegenerate }: CardProps) {
+function ArtifactCard({ meta, status, progress, taskId, onGenerate, onPreview, onRegenerate, onCancel, onDownload }: CardProps) {
   const [imgError, setImgError] = useState(false)
 
   const borderColor = status === 'generating'
@@ -258,56 +277,30 @@ function ArtifactCard({ meta, status, progress, artifactTitle, onGenerate, onPre
       {/* Thumbnail */}
       <div
         className="relative w-full overflow-hidden"
-        style={{
-          height: 88,
-          background: 'var(--color-app-bg)',
-          borderBottom: '1px solid var(--color-separator)',
-        }}
+        style={{ height: 88, background: 'var(--color-app-bg)', borderBottom: '1px solid var(--color-separator)' }}
       >
         {meta.thumbnail && !imgError ? (
-          <img
-            src={meta.thumbnail}
-            alt={meta.label}
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover"
-            style={{ opacity: 0.85 }}
-          />
+          <img src={meta.thumbnail} alt={meta.label} onError={() => setImgError(true)} className="w-full h-full object-cover" style={{ opacity: 0.85 }} />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <span style={{ color: 'var(--color-text-tertiary)', opacity: 0.5 }}>
-              {/* scale up the icon for placeholder */}
-              {meta.icon}
-            </span>
+            <span style={{ color: 'var(--color-text-tertiary)', opacity: 0.5 }}>{meta.icon}</span>
           </div>
         )}
 
         {/* Generating overlay */}
         {status === 'generating' && (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center gap-1.5"
-            style={{ background: 'rgba(0,0,0,0.55)' }}
-          >
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5" style={{ background: 'rgba(0,0,0,0.55)' }}>
             <Loader2 size={18} className="animate-spin text-white" />
             <span className="text-xs font-semibold text-white">{progress}%</span>
             <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${progress}%`,
-                  background: 'var(--color-accent)',
-                  transition: 'width 400ms ease',
-                }}
-              />
+              <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'var(--color-accent)', transition: 'width 400ms ease' }} />
             </div>
           </div>
         )}
 
         {/* Ready badge */}
         {status === 'ready' && (
-          <div
-            className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-            style={{ background: 'rgba(52,199,89,0.15)', color: '#34C759' }}
-          >
+          <div className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'rgba(52,199,89,0.15)', color: '#34C759' }}>
             Ready
           </div>
         )}
@@ -315,38 +308,30 @@ function ArtifactCard({ meta, status, progress, artifactTitle, onGenerate, onPre
 
       {/* Body */}
       <div className="flex flex-col flex-1 p-3 gap-2">
-        {/* Title row */}
         <div className="flex items-center gap-1.5">
           <span style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}>{meta.icon}</span>
-          <span className="text-sm font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
-            {meta.label}
-          </span>
+          <span className="text-sm font-semibold leading-tight" style={{ color: 'var(--color-text-primary)' }}>{meta.label}</span>
         </div>
+        <p className="text-xs leading-snug" style={{ color: 'var(--color-text-secondary)' }}>{meta.description}</p>
 
-        {/* Description */}
-        <p className="text-xs leading-snug" style={{ color: 'var(--color-text-secondary)' }}>
-          {meta.description}
-        </p>
-
-        {/* Action */}
+        {/* Actions */}
         <div className="mt-auto pt-1">
           {status === 'none' && (
-            <button
-              onClick={onGenerate}
-              className="w-full rounded-lg py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-85"
-              style={{ background: 'var(--color-accent)' }}
-            >
+            <button onClick={onGenerate} className="w-full rounded-lg py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-85" style={{ background: 'var(--color-accent)' }}>
               Generate
             </button>
           )}
 
           {status === 'generating' && (
             <button
-              disabled
-              className="w-full rounded-lg py-1.5 text-xs font-semibold"
-              style={{ background: 'var(--color-accent-subtle)', color: 'var(--color-accent)', cursor: 'not-allowed' }}
+              onClick={onCancel}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-colors"
+              style={{ background: 'var(--color-app-bg)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-separator)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.borderColor = 'var(--color-error)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)'; e.currentTarget.style.borderColor = 'var(--color-separator)' }}
             >
-              Generating…
+              <X size={11} />
+              Cancel
             </button>
           )}
 
@@ -359,6 +344,16 @@ function ArtifactCard({ meta, status, progress, artifactTitle, onGenerate, onPre
               >
                 <Play size={11} />
                 Open
+              </button>
+              <button
+                onClick={onDownload}
+                className="flex items-center justify-center rounded-lg px-2.5 py-1.5 transition-colors"
+                style={{ background: 'var(--color-app-bg)', border: '1px solid var(--color-separator)', color: 'var(--color-text-secondary)' }}
+                title="Download"
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+              >
+                <Download size={12} />
               </button>
               <button
                 onClick={onRegenerate}
@@ -374,11 +369,7 @@ function ArtifactCard({ meta, status, progress, artifactTitle, onGenerate, onPre
           )}
 
           {status === 'error' && (
-            <button
-              onClick={onGenerate}
-              className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-colors"
-              style={{ background: 'rgba(255,69,58,0.1)', color: 'var(--color-error)' }}
-            >
+            <button onClick={onGenerate} className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-colors" style={{ background: 'rgba(255,69,58,0.1)', color: 'var(--color-error)' }}>
               <AlertCircle size={12} />
               Retry
             </button>

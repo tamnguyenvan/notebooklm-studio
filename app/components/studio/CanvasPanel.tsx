@@ -102,21 +102,34 @@ export function CanvasPanel() {
   return (
     <AnimatePresence>
       {canvasItem && (
-        <motion.div
-          key="canvas-panel"
-          initial={{ x: '100%', opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: '100%', opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-          className="flex flex-col border-l overflow-hidden"
-          style={{
-            width: expanded ? '600px' : '360px',
-            minWidth: '300px',
-            background: 'var(--color-content-bg)',
-            borderColor: 'var(--color-separator)',
-            transition: 'width 200ms ease',
-          }}
-        >
+        <>
+          {/* Backdrop — click to close */}
+          <motion.div
+            key="canvas-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-30"
+            style={{ top: 52 }}
+            onClick={closeCanvas}
+          />
+
+          <motion.div
+            key="canvas-panel"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            className="fixed top-0 right-0 bottom-0 flex flex-col z-40 border-l overflow-hidden"
+            style={{
+              width: expanded ? 600 : 380,
+              background: 'var(--color-content-bg)',
+              borderColor: 'var(--color-separator)',
+              boxShadow: 'var(--shadow-xl)',
+              top: 52,
+            }}
+          >
           {/* Header */}
           <div
             className="flex items-center gap-2 px-3 py-3 border-b shrink-0"
@@ -223,6 +236,7 @@ export function CanvasPanel() {
             </div>
           )}
         </motion.div>
+        </>
       )}
     </AnimatePresence>
   )
