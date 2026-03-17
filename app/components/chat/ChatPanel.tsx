@@ -336,7 +336,7 @@ function PersonaModal({ notebookId, onClose }: { notebookId: string; onClose: ()
 // ── Main ChatPanel ────────────────────────────────────────────────────────────
 
 export function ChatPanel({ notebookId }: { notebookId: string }) {
-  const { messages, loading, loadHistory, sendMessage } = useChatStore()
+  const { messages, loading, historyLoaded, loadHistory, sendMessage } = useChatStore()
   const { sources } = useSourceStore()
   const { prefillNote } = useNotesStore()
   const { openNote } = useArtifactStore()
@@ -350,6 +350,7 @@ export function ChatPanel({ notebookId }: { notebookId: string }) {
 
   const notebookMessages = messages[notebookId] ?? []
   const isLoading = loading[notebookId] ?? false
+  const historyReady = historyLoaded[notebookId] ?? false
   const notebookSources = (sources[notebookId] ?? []).map((s) => ({ id: s.id, title: s.title }))
 
   // Load history on mount
@@ -415,7 +416,24 @@ export function ChatPanel({ notebookId }: { notebookId: string }) {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4"
       >
-        {isEmpty && (
+        {!historyReady && (
+          <div className="flex flex-col gap-3 px-1 pt-2">
+            {[80, 55, 70].map((w, i) => (
+              <div key={i} className={`flex gap-3 ${i % 2 === 1 ? 'justify-end' : ''}`}>
+                <div
+                  className="rounded-2xl animate-pulse"
+                  style={{
+                    width: `${w}%`,
+                    height: 48,
+                    background: 'var(--color-separator)',
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {historyReady && isEmpty && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
             <div
               className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold"
