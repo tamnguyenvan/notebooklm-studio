@@ -16,6 +16,7 @@ type View = 'notebooks' | 'library' | 'settings'
 export function AppShell() {
   const { activeNotebookId, setActiveNotebook } = useNotebookStore()
   const [view, setView] = useState<View>('notebooks')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   // Close library/settings when a notebook is selected
   useEffect(() => {
@@ -38,10 +39,10 @@ export function AppShell() {
       className="flex h-screen w-screen flex-col overflow-hidden"
       style={{ background: 'var(--color-app-bg)' }}
     >
-      <TitleBar onSettingsOpen={handleSettingsOpen} />
+      <TitleBar onSettingsOpen={handleSettingsOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} sidebarOpen={sidebarOpen} />
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar onLibraryOpen={handleLibraryOpen} onAllNotebooks={handleAllNotebooks} />
+        <Sidebar onLibraryOpen={handleLibraryOpen} onAllNotebooks={handleAllNotebooks} open={sidebarOpen} />
 
         <main
           className="flex flex-1 flex-col overflow-hidden"

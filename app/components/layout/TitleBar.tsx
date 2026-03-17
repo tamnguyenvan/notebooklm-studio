@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Bell, MessageSquare, Settings, LogOut, CheckCheck, X, Trash2 } from 'lucide-react'
+import { Bell, MessageSquare, Settings, LogOut, CheckCheck, X, Trash2, PanelLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AP = AnimatePresence as any
@@ -25,9 +25,11 @@ const PLATFORM = getPlatform()
 
 interface TitleBarProps {
   onSettingsOpen: () => void
+  onToggleSidebar: () => void
+  sidebarOpen: boolean
 }
 
-export function TitleBar({ onSettingsOpen }: TitleBarProps) {
+export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen }: TitleBarProps) {
   const { account, logout } = useAuthStore()
   const { notifications, markRead, markAllRead, remove, clear, unreadCount } = useNotificationStore()
   const [avatarOpen, setAvatarOpen] = useState(false)
@@ -98,55 +100,50 @@ export function TitleBar({ onSettingsOpen }: TitleBarProps) {
         zIndex: 50,
       }}
     >
-      {/* ── Traffic lights / window controls ── */}
+      {/* ── Left inset: traffic lights (macOS/Linux) or window controls (Windows) + sidebar toggle ── */}
       {PLATFORM === 'macos' ? (
-        // macOS: native traffic lights are rendered by the OS in the 80px inset.
-        // titleBarStyle: "Overlay" keeps them visible — we just leave the space.
-        <div className="w-[80px] shrink-0" />
+        // macOS: native traffic lights occupy the 80px inset; toggle sits right after
+        <div className="flex w-[80px] shrink-0 items-center justify-end pr-1">
+          <SidebarToggle open={sidebarOpen} onClick={onToggleSidebar} />
+        </div>
       ) : PLATFORM === 'linux' ? (
-        // Linux: render macOS-style circles ourselves
-        <div className="flex items-center gap-[7px] pl-[18px] pr-3">
+        <div className="flex items-center gap-[7px] pl-[18px] pr-1">
           <TrafficDot color="#FF5F57" hoverColor="#FF3B30" title="Close"    onClick={() => win().close()} />
           <TrafficDot color="#FEBC2E" hoverColor="#FF9500" title="Minimize" onClick={() => win().minimize()} />
           <TrafficDot color="#28C840" hoverColor="#34C759" title="Maximize" onClick={() => win().toggleMaximize()} />
+          <div className="ml-12">
+            <SidebarToggle open={sidebarOpen} onClick={onToggleSidebar} />
+          </div>
         </div>
       ) : (
-        // Windows: iconify SVG buttons on the left
+        // Windows: window controls on left, then toggle
         <div className="flex items-center">
           <WinBtn title="Minimize" onClick={() => win().minimize()}>
-            {/* mdi:window-minimize */}
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
               <path fill="currentColor" d="M19 13H5v-2h14z"/>
             </svg>
           </WinBtn>
           <WinBtn title={isMaximized ? 'Restore' : 'Maximize'} onClick={() => win().toggleMaximize()}>
             {isMaximized ? (
-              /* mdi:window-restore */
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M4 8h4V4h12v12h-4v4H4zm12 0v6h2V6h-8v2zM6 10v8h8v-8z"/>
               </svg>
             ) : (
-              /* mdi:window-maximize */
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M4 4h16v16H4zm2 4v10h12V8z"/>
               </svg>
             )}
           </WinBtn>
           <WinBtn title="Close" onClick={() => win().close()} danger>
-            {/* mdi:close */}
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24">
               <path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"/>
             </svg>
           </WinBtn>
+          <div className="ml-1 mr-2">
+            <SidebarToggle open={sidebarOpen} onClick={onToggleSidebar} />
+          </div>
         </div>
       )}
-
-      {/* App name */}
-      <div className="flex shrink-0 items-center gap-2 select-none cursor-default" style={{ color: 'var(--color-text-primary)' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="" className="h-5 w-5" draggable={false} />
-        <span className="text-sm font-semibold">NotebookLM Studio</span>
-      </div>
 
       {/* Drag spacer */}
       <div className="flex-1" />
@@ -279,6 +276,27 @@ export function TitleBar({ onSettingsOpen }: TitleBarProps) {
 }
 
 // ── Window control primitives ─────────────────────────────────────────────────
+
+function SidebarToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <button
+      title={open ? 'Hide sidebar' : 'Show sidebar'}
+      onClick={onClick}
+      className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+      style={{ color: open ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'rgba(0,0,0,0.07)'
+        e.currentTarget.style.color = 'var(--color-text-primary)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
+        e.currentTarget.style.color = open ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'
+      }}
+    >
+      <PanelLeft size={15} />
+    </button>
+  )
+}
 
 function TrafficDot({ color, hoverColor, title, onClick }: {
   color: string; hoverColor: string; title: string; onClick: () => void

@@ -3,15 +3,19 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Plus, BookOpen, Library } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
 import { useNotebookStore } from '../../stores/notebookStore'
 import { NewNotebookModal } from '../notebooks/NewNotebookModal'
 
 export function Sidebar({
   onLibraryOpen,
   onAllNotebooks,
+  open,
 }: {
   onLibraryOpen: () => void
   onAllNotebooks: () => void
+  open: boolean
 }) {
   const { notebooks, activeNotebookId, setActiveNotebook, renameNotebook } = useNotebookStore()
   const [modalOpen, setModalOpen] = useState(false)
@@ -39,15 +43,22 @@ export function Sidebar({
   }
 
   return (
-    <div
-      className="flex h-full w-[240px] shrink-0 flex-col"
-      style={{
-        background: 'var(--color-sidebar-bg)',
-        backdropFilter: 'blur(20px) saturate(1.6)',
-        WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
-        borderRight: '1px solid var(--color-separator)',
-      }}
-    >
+    <AP initial={false}>
+      {open && (
+        <motion.div
+          key="sidebar"
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 240, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+          className="flex h-full shrink-0 flex-col overflow-hidden"
+          style={{
+            background: 'var(--color-sidebar-bg)',
+            backdropFilter: 'blur(20px) saturate(1.6)',
+            WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
+            borderRight: '1px solid var(--color-separator)',
+          }}
+        >
       {/* Notebooks section */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 pb-1 pt-3">
@@ -186,7 +197,9 @@ export function Sidebar({
       </div>
 
       <NewNotebookModal open={modalOpen} onClose={() => setModalOpen(false)} />
-    </div>
+        </motion.div>
+      )}
+    </AP>
   )
 }
 
