@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { ipc, Artifact, ArtifactType, GenerateConfig } from '../lib/ipc'
 
+const STALE_MS = 30_000
+
 export interface ActiveTask {
   taskId: string
   notebookId: string
@@ -13,12 +15,13 @@ interface ArtifactStore {
   // artifacts keyed by notebookId
   artifacts: Record<string, Artifact[]>
   loading: Record<string, boolean>
+  lastFetched: Record<string, number>
   // active generation tasks
   activeTasks: ActiveTask[]
   // canvas: which artifact is open
   canvasItem: { notebookId: string; artifactType: ArtifactType } | { notebookId: string; noteId: string; type: 'note' } | null
 
-  fetchArtifacts: (notebookId: string) => Promise<void>
+  fetchArtifacts: (notebookId: string, force?: boolean) => Promise<void>
   generate: (notebookId: string, config: GenerateConfig) => Promise<string>
   cancelTask: (taskId: string) => Promise<void>
   // WS event handlers
@@ -34,10 +37,16 @@ interface ArtifactStore {
 export const useArtifactStore = create<ArtifactStore>((set) => ({
   artifacts: {},
   loading: {},
+  lastFetched: {},
   activeTasks: [],
   canvasItem: null,
 
-  fetchArtifacts: async (notebookId) => {
+  fetchArtifacts: async (notebookId, force = false) => {
+    const s0 = useArtifactStore.getState()
+    const last = s0.lastFetched[notebookId] ?? 0
+    // Skip if fresh AND no active tasks for this notebook (generating tasks need live data)
+    const hasActiveTasks = s0.activeTasks.some((t) => t.notebookId === notebookId)
+    if (!force && !hasActiveTasks && Date.now() - last < STALE_MS && (s0.artifacts[notebookId]?.length ?? 0) > 0) return
     set((s) => ({ loading: { ...s.loading, [notebookId]: true } }))
     try {
       const artifacts = await ipc.listArtifacts(notebookId)
@@ -55,6 +64,7 @@ export const useArtifactStore = create<ArtifactStore>((set) => ({
         return {
           artifacts: { ...s.artifacts, [notebookId]: [...merged, ...localOnly] },
           loading: { ...s.loading, [notebookId]: false },
+          lastFetched: { ...s.lastFetched, [notebookId]: Date.now() },
         }
       })
     } catch {

@@ -1,14 +1,17 @@
 import { create } from 'zustand'
 import { ipc, Note } from '../lib/ipc'
 
+const STALE_MS = 30_000
+
 interface NotesStore {
   // notes keyed by notebookId
   notes: Record<string, Note[]>
   loading: Record<string, boolean>
+  lastFetched: Record<string, number>
   // which note is open in canvas per notebook
   activeNoteId: Record<string, string | null>
 
-  fetchNotes: (notebookId: string) => Promise<void>
+  fetchNotes: (notebookId: string, force?: boolean) => Promise<void>
   createNote: (notebookId: string, title?: string, content?: string) => Promise<Note>
   updateNote: (notebookId: string, noteId: string, title: string, content: string) => Promise<void>
   deleteNote: (notebookId: string, noteId: string) => Promise<void>
@@ -20,15 +23,19 @@ interface NotesStore {
 export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: {},
   loading: {},
+  lastFetched: {},
   activeNoteId: {},
 
-  fetchNotes: async (notebookId) => {
+  fetchNotes: async (notebookId, force = false) => {
+    const last = get().lastFetched[notebookId] ?? 0
+    if (!force && Date.now() - last < STALE_MS && (get().notes[notebookId]?.length ?? 0) > 0) return
     set((s) => ({ loading: { ...s.loading, [notebookId]: true } }))
     try {
       const notes = await ipc.listNotes(notebookId)
       set((s) => ({
         notes: { ...s.notes, [notebookId]: notes },
         loading: { ...s.loading, [notebookId]: false },
+        lastFetched: { ...s.lastFetched, [notebookId]: Date.now() },
       }))
     } catch {
       set((s) => ({ loading: { ...s.loading, [notebookId]: false } }))

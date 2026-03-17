@@ -1,13 +1,16 @@
 import { create } from 'zustand'
 import { ipc, Source, SourceStatus } from '../lib/ipc'
 
+const STALE_MS = 30_000
+
 interface SourceStore {
   // sources keyed by notebookId
   sources: Record<string, Source[]>
   loading: Record<string, boolean>
   error: Record<string, string | null>
+  lastFetched: Record<string, number>
 
-  fetchSources: (notebookId: string) => Promise<void>
+  fetchSources: (notebookId: string, force?: boolean) => Promise<void>
   addSource: (source: Source) => void
   updateSourceStatus: (notebookId: string, sourceId: string, status: SourceStatus) => void
   deleteSource: (notebookId: string, sourceId: string) => Promise<void>
@@ -18,14 +21,18 @@ export const useSourceStore = create<SourceStore>((set, get) => ({
   sources: {},
   loading: {},
   error: {},
+  lastFetched: {},
 
-  fetchSources: async (notebookId) => {
+  fetchSources: async (notebookId, force = false) => {
+    const last = get().lastFetched[notebookId] ?? 0
+    if (!force && Date.now() - last < STALE_MS && (get().sources[notebookId]?.length ?? 0) > 0) return
     set((s) => ({ loading: { ...s.loading, [notebookId]: true }, error: { ...s.error, [notebookId]: null } }))
     try {
       const sources = await ipc.listSources(notebookId)
       set((s) => ({
         sources: { ...s.sources, [notebookId]: sources },
         loading: { ...s.loading, [notebookId]: false },
+        lastFetched: { ...s.lastFetched, [notebookId]: Date.now() },
       }))
     } catch (e) {
       set((s) => ({
