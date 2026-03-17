@@ -1,6 +1,19 @@
 import { create } from 'zustand'
 import { ipc, Notebook } from '../lib/ipc'
 
+const RECENTS_KEY = 'nb_recents'
+const RECENTS_MAX = 8
+
+function loadRecents(): string[] {
+  if (typeof localStorage === 'undefined') return []
+  try { return JSON.parse(localStorage.getItem(RECENTS_KEY) ?? '[]') } catch { return [] }
+}
+
+function saveRecents(ids: string[]) {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(RECENTS_KEY, JSON.stringify(ids))
+}
+
 // Shared sort: pinned first, then newest first
 function sortNotebooks(list: Notebook[]): Notebook[] {
   return [...list].sort((a, b) => {
@@ -14,6 +27,7 @@ function sortNotebooks(list: Notebook[]): Notebook[] {
 interface NotebookStore {
   notebooks: Notebook[]
   activeNotebookId: string | null
+  recentIds: string[]
   loading: boolean
   error: string | null
 
@@ -23,6 +37,7 @@ interface NotebookStore {
   deleteNotebook: (id: string) => Promise<void>
   pinNotebook: (id: string, pinned: boolean) => Promise<void>
   setActiveNotebook: (id: string | null) => void
+  removeRecent: (id: string) => void
   // Optimistic helpers
   _applyOptimistic: (notebooks: Notebook[]) => void
 }
@@ -30,6 +45,7 @@ interface NotebookStore {
 export const useNotebookStore = create<NotebookStore>((set, get) => ({
   notebooks: [],
   activeNotebookId: null,
+  recentIds: loadRecents(),
   loading: false,
   error: null,
 
@@ -74,6 +90,10 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
     try {
       await ipc.deleteNotebook(id)
       if (get().activeNotebookId === id) set({ activeNotebookId: null })
+      // Also remove from recents
+      const recents = get().recentIds.filter((r) => r !== id)
+      saveRecents(recents)
+      set({ recentIds: recents })
     } catch (e) {
       set({ notebooks: prev })
       throw e
@@ -92,7 +112,24 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
     }
   },
 
-  setActiveNotebook: (id) => set({ activeNotebookId: id }),
+  setActiveNotebook: (id) => {
+    if (id) {
+      // Push previous active to recents
+      const prev = get().activeNotebookId
+      if (prev && prev !== id) {
+        const recents = [prev, ...get().recentIds.filter((r) => r !== prev && r !== id)].slice(0, RECENTS_MAX)
+        saveRecents(recents)
+        set({ recentIds: recents })
+      }
+    }
+    set({ activeNotebookId: id })
+  },
+
+  removeRecent: (id) => {
+    const recents = get().recentIds.filter((r) => r !== id)
+    saveRecents(recents)
+    set({ recentIds: recents })
+  },
 
   _applyOptimistic: (notebooks) => set({ notebooks }),
 }))
