@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
 import { X } from 'lucide-react'
 import { useNotebookStore } from '../../stores/notebookStore'
 
@@ -45,32 +48,33 @@ export function NewNotebookModal({ open, onClose }: Props) {
     if (e.key === 'Escape') onClose()
   }
 
-  return (
-    <AnimatePresence>
+  const content = (
+    <AP>
       {open && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop — also acts as the centering flex container */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[100]"
+            className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
             onClick={onClose}
-          />
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-            className="fixed left-1/2 top-1/2 z-[101] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-2xl p-6"
-            style={{
-              background: 'var(--color-elevated)',
-              boxShadow: 'var(--shadow-xl)',
-            }}
           >
+            {/* Modal — stop click propagation so clicking inside doesn't close */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative z-[9999] w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-2xl p-6"
+              style={{
+                background: 'var(--color-elevated)',
+                boxShadow: 'var(--shadow-xl)',
+              }}
+            >
             {/* Header */}
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
@@ -152,9 +156,13 @@ export function NewNotebookModal({ open, onClose }: Props) {
                 {loading ? 'Creating…' : 'Create notebook'}
               </button>
             </div>
+            </motion.div>
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AP>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(content, document.body)
 }
