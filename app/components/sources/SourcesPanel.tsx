@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
 import { Plus, RefreshCw, Trash2, FileText, Link, Youtube, HardDrive, AlignLeft, MoreHorizontal, AlertCircle } from 'lucide-react'
 import { useSourceStore } from '../../stores/sourceStore'
 import { useToastStore } from '../../stores/toastStore'
@@ -68,12 +70,7 @@ function SourceRow({ source, notebookId }: { source: Source; notebookId: string 
   const canRefresh = source.type === 'url' || source.type === 'youtube' || source.type === 'gdrive'
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={spring}
+    <div
       className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors"
       style={{ background: 'transparent' }}
       onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
@@ -122,7 +119,7 @@ function SourceRow({ source, notebookId }: { source: Source; notebookId: string 
           <MoreHorizontal className="w-4 h-4" />
         </button>
 
-        <AnimatePresence>
+        <AP>
           {menuOpen && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: -4 }}
@@ -160,9 +157,9 @@ function SourceRow({ source, notebookId }: { source: Source; notebookId: string 
               </button>
             </motion.div>
           )}
-        </AnimatePresence>
+        </AP>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -252,22 +249,20 @@ export function SourcesPanel({ notebookId }: { notebookId: string }) {
           </div>
         )}
 
-        <AnimatePresence initial={false}>
-          {notebookSources.map((src) => (
-            <SourceRow key={src.id} source={src} notebookId={notebookId} />
-          ))}
-        </AnimatePresence>
+        {notebookSources.map((src) => (
+          <SourceRow key={src.id} source={src} notebookId={notebookId} />
+        ))}
       </div>
 
       {/* Add Source Modal */}
-      <AnimatePresence>
+      <AP>
         {showAddModal && (
           <AddSourceModal
             notebookId={notebookId}
             onClose={() => setShowAddModal(false)}
           />
         )}
-      </AnimatePresence>
+      </AP>
     </div>
   )
 }
