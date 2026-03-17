@@ -1,12 +1,19 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Plus, BookOpen, Library } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Plus, BookOpen, Library, Pencil, Pin, PinOff, Trash2, Share2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AP = AnimatePresence as any
 import { useNotebookStore } from '../../stores/notebookStore'
+import { useToastStore } from '../../stores/toastStore'
 import { NewNotebookModal } from '../notebooks/NewNotebookModal'
+import { ShareModal } from '../sharing/ShareModal'
+import { Notebook } from '../../lib/ipc'
+
+const MENU_W = 176
+const MENU_H = 200
 
 export function Sidebar({
   onLibraryOpen,
@@ -17,11 +24,26 @@ export function Sidebar({
   onAllNotebooks: () => void
   open: boolean
 }) {
-  const { notebooks, activeNotebookId, setActiveNotebook, renameNotebook } = useNotebookStore()
+  const { notebooks, activeNotebookId, setActiveNotebook, renameNotebook, deleteNotebook, pinNotebook, fetchNotebooks } = useNotebookStore()
+  const { show } = useToastStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const renameInputRef = useRef<HTMLInputElement>(null)
+  const [shareNotebook, setShareNotebook] = useState<Notebook | null>(null)
+
+  // Context menu state: { id, x, y }
+  const [ctxMenu, setCtxMenu] = useState<{ nb: Notebook; x: number; y: number } | null>(null)
+  const ctxRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    const handler = (e: MouseEvent) => {
+      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtxMenu(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [ctxMenu])
 
   useEffect(() => {
     if (renamingId) setTimeout(() => renameInputRef.current?.select(), 30)
@@ -42,7 +64,36 @@ export function Sidebar({
     }
   }
 
+  const handleCtxRename = (nb: Notebook) => {
+    setCtxMenu(null)
+    setRenameValue(nb.title)
+    setRenamingId(nb.id)
+  }
+
+  const handleCtxPin = (nb: Notebook) => {
+    setCtxMenu(null)
+    pinNotebook(nb.id, !nb.is_pinned)
+  }
+
+  const handleCtxShare = (nb: Notebook) => {
+    setCtxMenu(null)
+    setShareNotebook(nb)
+  }
+
+  const handleCtxDelete = (nb: Notebook) => {
+    setCtxMenu(null)
+    deleteNotebook(nb.id)
+    show({
+      type: 'undo',
+      message: `"${nb.title}" deleted`,
+      undoLabel: 'Undo',
+      duration: 5000,
+      onUndo: async () => { await fetchNotebooks() },
+    })
+  }
+
   return (
+    <>
     <AP initial={false}>
       {open && (
         <motion.div
@@ -87,7 +138,7 @@ export function Sidebar({
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 pb-2">
-          <AnimatePresence initial={false}>
+          <AP initial={false}>
             {notebooks.map((nb) => {
               const isActive = nb.id === activeNotebookId
               const isRenaming = renamingId === nb.id
@@ -129,6 +180,10 @@ export function Sidebar({
                     <button
                       onClick={() => setActiveNotebook(nb.id)}
                       onDoubleClick={() => startRename(nb.id, nb.title)}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        setCtxMenu({ nb, x: e.clientX, y: e.clientY })
+                      }}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors"
                       style={{
                         background: isActive ? 'var(--color-accent-subtle)' : 'transparent',
@@ -152,7 +207,7 @@ export function Sidebar({
                 </motion.div>
               )
             })}
-          </AnimatePresence>
+          </AP>
 
           {notebooks.length === 0 && (
             <button
@@ -200,6 +255,46 @@ export function Sidebar({
         </motion.div>
       )}
     </AP>
+
+    {/* Context menu — portalled to body to escape overflow:hidden */}
+    {ctxMenu && typeof document !== 'undefined' && createPortal(
+      <div
+        ref={ctxRef}
+        className="fixed z-[9999] overflow-hidden rounded-xl py-1.5"
+        style={{
+          top: Math.min(ctxMenu.y, window.innerHeight - MENU_H - 8),
+          left: Math.min(ctxMenu.x, window.innerWidth - MENU_W - 8),
+          width: MENU_W,
+          background: 'var(--color-elevated)',
+          border: '1px solid var(--color-separator)',
+          boxShadow: 'var(--shadow-lg)',
+        }}
+      >
+        <CtxItem icon={<Pencil size={13} />} label="Rename" onClick={() => handleCtxRename(ctxMenu.nb)} />
+        <div className="my-1 h-px" style={{ background: 'var(--color-separator)' }} />
+        <CtxItem icon={<Share2 size={13} />} label="Share" onClick={() => handleCtxShare(ctxMenu.nb)} />
+        <div className="my-1 h-px" style={{ background: 'var(--color-separator)' }} />
+        <CtxItem
+          icon={ctxMenu.nb.is_pinned ? <PinOff size={13} /> : <Pin size={13} />}
+          label={ctxMenu.nb.is_pinned ? 'Unpin' : 'Pin'}
+          onClick={() => handleCtxPin(ctxMenu.nb)}
+        />
+        <div className="my-1 h-px" style={{ background: 'var(--color-separator)' }} />
+        <CtxItem icon={<Trash2 size={13} />} label="Delete" onClick={() => handleCtxDelete(ctxMenu.nb)} danger />
+      </div>,
+      document.body
+    )}
+
+    {/* Share modal — also portalled */}
+    {shareNotebook && typeof document !== 'undefined' && createPortal(
+      <ShareModal
+        notebookId={shareNotebook.id}
+        notebookTitle={shareNotebook.title}
+        onClose={() => setShareNotebook(null)}
+      />,
+      document.body
+    )}
+    </>
   )
 }
 
@@ -231,6 +326,28 @@ function SidebarLink({
       }}
     >
       {icon}
+      {label}
+    </button>
+  )
+}
+
+function CtxItem({
+  icon, label, onClick, danger,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors"
+      style={{ color: danger ? 'var(--color-error)' : 'var(--color-text-primary)' }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = danger ? 'rgba(255,69,58,0.08)' : 'rgba(0,0,0,0.04)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span className="flex w-4 items-center justify-center shrink-0">{icon}</span>
       {label}
     </button>
   )
