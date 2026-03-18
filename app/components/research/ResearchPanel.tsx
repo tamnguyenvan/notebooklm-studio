@@ -236,41 +236,35 @@ export function ResearchPanel({ notebookId }: Props) {
                 {sources.length} result{sources.length !== 1 ? 's' : ''}
                 {state?.query ? ` for "${state.query}"` : ''}
               </span>
-              {selectedCount > 0 && (
-                <button
-                  onClick={() => clearSelection(notebookId)}
-                  className="text-xs"
-                  style={{ color: 'var(--color-text-tertiary)' }}
-                >
-                  Clear
-                </button>
-              )}
+              {/* Always rendered — invisible when nothing selected to avoid layout shift */}
+              <button
+                onClick={() => clearSelection(notebookId)}
+                className="text-xs transition-opacity"
+                style={{
+                  color: 'var(--color-text-tertiary)',
+                  opacity: selectedCount > 0 ? 1 : 0,
+                  pointerEvents: selectedCount > 0 ? 'auto' : 'none',
+                }}
+              >
+                Clear
+              </button>
             </div>
             <div className="flex items-center gap-2">
-              {selectedCount > 0 && (
-                <button
-                  onClick={handleImportSelected}
-                  disabled={importingMany}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                  style={{ background: 'var(--color-accent)', color: '#fff' }}
-                >
-                  {importingMany ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Import className="w-3.5 h-3.5" />}
-                  Import Selected ({selectedCount})
-                </button>
-              )}
-              {unimportedCount > 0 && selectedCount === 0 && (
-                <button
-                  onClick={handleImportAll}
-                  disabled={importingMany}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
-                  style={{ borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-subtle)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  {importingMany ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Import className="w-3.5 h-3.5" />}
-                  Import All ({unimportedCount})
-                </button>
-              )}
+              {/* Single button that switches label/style — no layout shift */}
+              <button
+                onClick={selectedCount > 0 ? handleImportSelected : handleImportAll}
+                disabled={importingMany || (selectedCount === 0 && unimportedCount === 0)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
+                style={selectedCount > 0
+                  ? { borderColor: 'var(--color-accent)', background: 'var(--color-accent)', color: '#fff', minWidth: 130 }
+                  : { borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', background: 'transparent', minWidth: 130 }
+                }
+                onMouseEnter={(e) => { if (selectedCount === 0) e.currentTarget.style.background = 'var(--color-accent-subtle)' }}
+                onMouseLeave={(e) => { if (selectedCount === 0) e.currentTarget.style.background = 'transparent' }}
+              >
+                {importingMany ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Import className="w-3.5 h-3.5" />}
+                {selectedCount > 0 ? `Import Selected (${selectedCount})` : `Import All (${unimportedCount})`}
+              </button>
             </div>
           </motion.div>
         )}
