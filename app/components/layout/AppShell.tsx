@@ -15,16 +15,34 @@ import { useNotebookStore } from '../../stores/notebookStore'
 import { useShortcutStore } from '../../stores/shortcutStore'
 import { useShortcut } from '../../lib/useShortcut'
 import { ArtifactType } from '../../lib/ipc'
+import { useUIStore } from '../../stores/uiStore'
+import { appStore } from '../../stores/appStore'
 
 type View = 'notebooks' | 'library' | 'settings'
 
 export function AppShell() {
-  const { activeNotebookId, setActiveNotebook } = useNotebookStore()
+  const { activeNotebookId, setActiveNotebook, fetchNotebooks } = useNotebookStore()
   const handleKeyDown = useShortcutStore((s) => s.handleKeyDown)
-  const [view, setView] = useState<View>('notebooks')
+  const { view, lastActiveNotebookId, prefsLoaded, loadPrefs, setView } = useUIStore()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [newNotebookOpen, setNewNotebookOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Load persisted UI prefs + theme on mount
+  useEffect(() => {
+    loadPrefs().then(() => {
+      // Restore last active notebook after prefs are loaded
+      const { lastActiveNotebookId: nbId, view: savedView } = useUIStore.getState()
+      if (savedView === 'notebooks' && nbId) {
+        setActiveNotebook(nbId)
+      }
+    })
+    // Restore theme
+    appStore.get<string>('settings.theme').then((t) => {
+      if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark')
+      else if (t === 'light') document.documentElement.setAttribute('data-theme', 'light')
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mount global shortcut listener
   useEffect(() => {
@@ -32,19 +50,19 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // Close library/settings when a notebook is selected
+  // Close library/settings when a notebook is selected; persist the change
   useEffect(() => {
-    if (activeNotebookId != null) setView('notebooks')
-  }, [activeNotebookId])
+    if (activeNotebookId != null) setView('notebooks', activeNotebookId)
+  }, [activeNotebookId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLibraryOpen = useCallback(() => { setView('library'); setActiveNotebook(null) }, [setActiveNotebook])
-  const handleSettingsOpen = useCallback(() => { setView('settings'); setActiveNotebook(null) }, [setActiveNotebook])
-  const handleAllNotebooks = useCallback(() => { setView('notebooks'); setActiveNotebook(null) }, [setActiveNotebook])
+  const handleLibraryOpen = useCallback(() => { setView('library'); setActiveNotebook(null) }, [setView, setActiveNotebook])
+  const handleSettingsOpen = useCallback(() => { setView('settings'); setActiveNotebook(null) }, [setView, setActiveNotebook])
+  const handleAllNotebooks = useCallback(() => { setView('notebooks', null); setActiveNotebook(null) }, [setView, setActiveNotebook])
   const handleToggleTheme = useCallback(() => {
     const root = document.documentElement
     const isDark = root.getAttribute('data-theme') === 'dark'
     root.setAttribute('data-theme', isDark ? 'light' : 'dark')
-    localStorage.setItem('settings.theme', isDark ? 'light' : 'dark')
+    void appStore.set('settings.theme', isDark ? 'light' : 'dark')
   }, [])
 
   // Register app-level shortcuts

@@ -7,6 +7,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { ShortcutsTab } from './ShortcutsTab'
+import { appStore } from '../../stores/appStore'
 
 type Tab = 'appearance' | 'downloads' | 'shortcuts' | 'account' | 'about'
 type Theme = 'light' | 'dark' | 'system'
@@ -26,15 +27,17 @@ export function SettingsScreen() {
   const [downloadFolder, setDownloadFolder] = useState('')
 
   useEffect(() => {
-    const saved = localStorage.getItem('settings.theme') as Theme | null
-    if (saved) setTheme(saved)
-    const folder = localStorage.getItem('settings.downloadFolder')
-    if (folder) setDownloadFolder(folder)
+    appStore.get<Theme>('settings.theme').then((saved) => {
+      if (saved) setTheme(saved)
+    }).catch(() => {})
+    appStore.get<string>('settings.downloadFolder').then((folder) => {
+      if (folder) setDownloadFolder(folder)
+    }).catch(() => {})
   }, [])
 
   const applyTheme = (t: Theme) => {
     setTheme(t)
-    localStorage.setItem('settings.theme', t)
+    void appStore.set('settings.theme', t)
     const root = document.documentElement
     if (t === 'dark') root.setAttribute('data-theme', 'dark')
     else if (t === 'light') root.setAttribute('data-theme', 'light')
@@ -46,7 +49,7 @@ export function SettingsScreen() {
       const selected = await openDialog({ directory: true, multiple: false })
       if (typeof selected === 'string') {
         setDownloadFolder(selected)
-        localStorage.setItem('settings.downloadFolder', selected)
+        void appStore.set('settings.downloadFolder', selected)
       }
     } catch {
       // user cancelled

@@ -1,11 +1,8 @@
 import { create } from 'zustand'
-import { LazyStore } from '@tauri-apps/plugin-store'
 import { ipc, Notebook } from '../lib/ipc'
+import { appStore } from './appStore'
 
 const RECENTS_MAX = 5
-
-// tauri-plugin-store — persists to app data dir, survives restarts
-const appStore = new LazyStore('app-prefs.json', { autoSave: true })
 
 async function loadPinOrder(): Promise<Record<string, number>> {
   try { return (await appStore.get<Record<string, number>>('pin_order')) ?? {} } catch { return {} }
