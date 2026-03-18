@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AP = AnimatePresence as any
 import { X, Link, Check, UserPlus, Trash2, Globe, Lock, ChevronDown } from 'lucide-react'
 import { useSharingStore } from '../../stores/sharingStore'
 import { useToastStore } from '../../stores/toastStore'
@@ -63,7 +65,7 @@ function PermissionSelect({
         />
       </button>
 
-      <AnimatePresence>
+      <AP>
         {open && (
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 4 }}
@@ -94,7 +96,7 @@ function PermissionSelect({
             ))}
           </motion.div>
         )}
-      </AnimatePresence>
+      </AP>
     </div>
   )
 }
@@ -102,10 +104,11 @@ function PermissionSelect({
 interface Props {
   notebookId: string
   notebookTitle: string
-  onClose: () => void
+  onClose?: () => void
+  inline?: boolean
 }
 
-export function ShareModal({ notebookId, notebookTitle, onClose }: Props) {
+export function ShareModal({ notebookId, notebookTitle, onClose, inline }: Props) {
   const { status, loading, fetchStatus, setPublic, addUser, removeUser } = useSharingStore()
   const { show } = useToastStore()
 
@@ -125,7 +128,7 @@ export function ShareModal({ notebookId, notebookTitle, onClose }: Props) {
   }, [notebookId])
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose?.() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
@@ -182,49 +185,8 @@ export function ShareModal({ notebookId, notebookTitle, onClose }: Props) {
     }
   }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.4)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.97 }}
-        transition={spring}
-        className="w-full max-w-md rounded-2xl overflow-hidden"
-        style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)' }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-5 pt-5 pb-4"
-        >
-          <div>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-              Share notebook
-            </h2>
-            <p className="text-xs mt-0.5 truncate max-w-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              {notebookTitle}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: 'var(--color-text-secondary)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div
-          className="px-5 pb-5 flex flex-col gap-5"
-        >
+  const content = (
+    <div className="px-5 pb-5 flex flex-col gap-5">
           {/* Public link section */}
           <div
             className="rounded-xl p-4 flex flex-col gap-3"
@@ -264,7 +226,7 @@ export function ShareModal({ notebookId, notebookTitle, onClose }: Props) {
             </div>
 
             {/* Copy link row — only when public */}
-            <AnimatePresence>
+            <AP>
               {shareStatus?.is_public && shareStatus.share_url && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -295,7 +257,7 @@ export function ShareModal({ notebookId, notebookTitle, onClose }: Props) {
                   </button>
                 </motion.div>
               )}
-            </AnimatePresence>
+            </AP>
           </div>
 
           {/* Invite people section */}
@@ -403,7 +365,59 @@ export function ShareModal({ notebookId, notebookTitle, onClose }: Props) {
               <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>Loading…</p>
             </div>
           )}
+    </div>
+  )
+
+  // Inline mode: render content directly (for right panel)
+  if (inline) {
+    return (
+      <div className="flex flex-col h-full overflow-y-auto">
+        <div className="px-5 pt-4 pb-2">
+          <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>{notebookTitle}</p>
         </div>
+        {content}
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        transition={spring}
+        className="w-full max-w-md rounded-2xl overflow-hidden"
+        style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4">
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              Share notebook
+            </h2>
+            <p className="text-xs mt-0.5 truncate max-w-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              {notebookTitle}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {content}
       </motion.div>
     </motion.div>
   )

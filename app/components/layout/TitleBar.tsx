@@ -28,9 +28,11 @@ interface TitleBarProps {
   onSettingsOpen: () => void
   onToggleSidebar: () => void
   sidebarOpen: boolean
+  onToggleStudio?: () => void
+  studioOpen?: boolean
 }
 
-export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen }: TitleBarProps) {
+export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen, onToggleStudio, studioOpen }: TitleBarProps) {
   const { account, logout } = useAuthStore()
   const { notifications, markRead, markAllRead, remove, clear, unreadCount } = useNotificationStore()
   const [avatarOpen, setAvatarOpen] = useState(false)
@@ -149,6 +151,20 @@ export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen }: Title
 
       {/* Right controls */}
       <div className="flex items-center gap-1 pr-3">
+
+        {/* Studio panel toggle */}
+        {onToggleStudio && (
+          <button
+            onClick={onToggleStudio}
+            className="flex items-center justify-center h-7 w-7 rounded-md transition-colors"
+            title={studioOpen ? 'Hide Studio' : 'Show Studio'}
+            style={{ color: studioOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.07)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = studioOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+          >
+            <PanelLeft size={15} style={{ transform: 'scaleX(-1)' }} />
+          </button>
+        )}
 
         {/* Feedback */}
         <button

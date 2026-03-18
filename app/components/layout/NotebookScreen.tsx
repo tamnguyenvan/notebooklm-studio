@@ -4,11 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { AnimatePresence } from 'framer-motion'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AP = AnimatePresence as any
-import { MessageSquare, BookOpen, Wand2, Search, StickyNote, ChevronLeft, Share2 } from 'lucide-react'
+import { MessageSquare, BookOpen, Search, StickyNote, ChevronLeft, Share2 } from 'lucide-react'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { SourcesPanel } from '../sources/SourcesPanel'
 import { ChatPanel } from '../chat/ChatPanel'
-import { StudioPanel } from '../studio/StudioPanel'
 import { CanvasPanel } from '../studio/CanvasPanel'
 import { BackgroundTaskBar } from '../studio/BackgroundTaskBar'
 import { ResearchPanel } from '../research/ResearchPanel'
@@ -22,12 +21,11 @@ import { useArtifactStore } from '../../stores/artifactStore'
 import { useSourceStore } from '../../stores/sourceStore'
 import { ArtifactType, GenerateConfig } from '../../lib/ipc'
 
-type TabId = 'chat' | 'sources' | 'studio' | 'research' | 'notes'
+type TabId = 'chat' | 'sources' | 'research' | 'notes'
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'chat',     label: 'Chat',     icon: <MessageSquare className="w-4 h-4" /> },
   { id: 'sources',  label: 'Sources',  icon: <BookOpen className="w-4 h-4" /> },
-  { id: 'studio',   label: 'Studio',   icon: <Wand2 className="w-4 h-4" /> },
   { id: 'research', label: 'Research', icon: <Search className="w-4 h-4" /> },
   { id: 'notes',    label: 'Notes',    icon: <StickyNote className="w-4 h-4" /> },
 ]
@@ -50,14 +48,11 @@ export function NotebookScreen({ notebookId }: Props) {
   const [renameValue, setRenameValue] = useState('')
   const nb = notebooks.find((n) => n.id === notebookId)
 
-  // Connect WS once when notebook screen mounts
   useEffect(() => {
     ws.connect(8008)
-    // Eagerly fetch artifacts to reconcile any in-progress tasks from a previous session
     fetchArtifacts(notebookId, true)
   }, [notebookId])
 
-  // Listen for palette events
   useEffect(() => {
     const onAddSource = (e: Event) => {
       const type = (e as CustomEvent).detail as 'url' | 'youtube' | 'file' | 'text' | 'gdrive'
@@ -72,7 +67,6 @@ export function NotebookScreen({ notebookId }: Props) {
     }
     const onNewNote = () => {
       setActiveTab('notes')
-      // Small delay so NotesPanel is visible before it triggers new note
       setTimeout(() => window.dispatchEvent(new CustomEvent('notes:new_note')), 50)
     }
     window.addEventListener('palette:add_source', onAddSource)
@@ -87,43 +81,24 @@ export function NotebookScreen({ notebookId }: Props) {
     }
   }, [])
 
-  // Tab shortcuts
-  useShortcut('tab_chat',     useCallback(() => setActiveTab('chat'),     []))
-  useShortcut('tab_sources',  useCallback(() => setActiveTab('sources'),  []))
-  useShortcut('tab_studio',   useCallback(() => setActiveTab('studio'),   []))
-  useShortcut('tab_research', useCallback(() => setActiveTab('research'), []))
-  useShortcut('tab_notes',    useCallback(() => setActiveTab('notes'),    []))
-
-  // Add source shortcut
-  useShortcut('add_source', useCallback(() => { setAddSourceType(null); setAddSourceOpen(true) }, []))
-
-  // Rename shortcut (F2)
-  useShortcut('rename', useCallback(() => {
-    if (!nb) return
-    setRenameValue(nb.title)
-    setRenaming(true)
-  }, [nb]))
-
-  // Toggle canvas shortcut
-  useShortcut('toggle_canvas', useCallback(() => {
-    if (canvasItem) closeCanvas()
-  }, [canvasItem, closeCanvas]))
+  useShortcut('tab_chat',      useCallback(() => setActiveTab('chat'),     []))
+  useShortcut('tab_sources',   useCallback(() => setActiveTab('sources'),  []))
+  useShortcut('tab_research',  useCallback(() => setActiveTab('research'), []))
+  useShortcut('tab_notes',     useCallback(() => setActiveTab('notes'),    []))
+  useShortcut('add_source',    useCallback(() => { setAddSourceType(null); setAddSourceOpen(true) }, []))
+  useShortcut('rename',        useCallback(() => { if (!nb) return; setRenameValue(nb.title); setRenaming(true) }, [nb]))
+  useShortcut('toggle_canvas', useCallback(() => { if (canvasItem) closeCanvas() }, [canvasItem, closeCanvas]))
 
   const handleRenameSubmit = async () => {
     const trimmed = renameValue.trim()
-    if (trimmed && trimmed !== nb?.title) {
-      await renameNotebook(notebookId, trimmed)
-    }
+    if (trimmed && trimmed !== nb?.title) await renameNotebook(notebookId, trimmed)
     setRenaming(false)
   }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Notebook header */}
-      <div
-        className="flex items-center gap-3 px-5 py-3 border-b"
-        style={{ borderColor: 'var(--color-separator)' }}
-      >
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-3 border-b" style={{ borderColor: 'var(--color-separator)' }}>
         <button
           onClick={() => setActiveNotebook(null)}
           className="p-1.5 rounded-lg transition-colors"
@@ -140,17 +115,11 @@ export function NotebookScreen({ notebookId }: Props) {
           <input
             autoFocus
             className="flex-1 text-base font-semibold bg-transparent outline-none rounded px-1"
-            style={{
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-accent)',
-            }}
+            style={{ color: 'var(--color-text-primary)', border: '1px solid var(--color-accent)' }}
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
             onBlur={handleRenameSubmit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleRenameSubmit()
-              if (e.key === 'Escape') setRenaming(false)
-            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleRenameSubmit(); if (e.key === 'Escape') setRenaming(false) }}
           />
         ) : (
           <h1
@@ -176,15 +145,12 @@ export function NotebookScreen({ notebookId }: Props) {
       </div>
 
       {/* Tab bar */}
-      <div
-        className="flex items-center gap-1 px-4 py-2 border-b"
-        style={{ borderColor: 'var(--color-separator)' }}
-      >
+      <div className="flex items-center gap-1 px-4 py-2 border-b" style={{ borderColor: 'var(--color-separator)' }}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors relative"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
             style={{
               color: activeTab === tab.id ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               background: activeTab === tab.id ? 'var(--color-accent-subtle)' : 'transparent',
@@ -196,11 +162,9 @@ export function NotebookScreen({ notebookId }: Props) {
         ))}
       </div>
 
-      {/* Main area: tab content + canvas panel side by side */}
+      {/* Main area */}
       <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Right column: tab content + task bar */}
         <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-          {/* Tab content — all panels stay mounted; only active one is visible */}
           <div className="flex-1 overflow-hidden relative">
             {TABS.map((tab) => (
               <div
@@ -210,33 +174,21 @@ export function NotebookScreen({ notebookId }: Props) {
               >
                 {tab.id === 'chat'     && <ChatPanel notebookId={notebookId} />}
                 {tab.id === 'sources'  && <SourcesPanel notebookId={notebookId} />}
-                {tab.id === 'studio'   && <StudioPanel notebookId={notebookId} />}
                 {tab.id === 'research' && <ResearchPanel notebookId={notebookId} />}
                 {tab.id === 'notes'    && <NotesPanel notebookId={notebookId} />}
               </div>
             ))}
           </div>
-
-          {/* Background task bar — scoped to right content area */}
           <BackgroundTaskBar notebookId={notebookId} />
         </div>
-
-        {/* Canvas panel */}
         <CanvasPanel />
       </div>
 
-      {/* Share modal */}
       <AP>
         {shareOpen && nb && (
-          <ShareModal
-            notebookId={notebookId}
-            notebookTitle={nb.title}
-            onClose={() => setShareOpen(false)}
-          />
+          <ShareModal notebookId={notebookId} notebookTitle={nb.title} onClose={() => setShareOpen(false)} />
         )}
       </AP>
-
-      {/* Add Source modal (triggered by Ctrl+Shift+S or palette) */}
       <AP>
         {addSourceOpen && (
           <AddSourceModal
@@ -246,8 +198,6 @@ export function NotebookScreen({ notebookId }: Props) {
           />
         )}
       </AP>
-
-      {/* Generate modal (triggered by palette) */}
       <AP>
         {generateType && (
           <GenerateModal
@@ -256,7 +206,7 @@ export function NotebookScreen({ notebookId }: Props) {
             onClose={() => setGenerateType(null)}
             onGenerate={async (config: GenerateConfig) => {
               setGenerateType(null)
-              try { await generate(notebookId, config) } catch { /* StudioPanel handles errors */ }
+              try { await generate(notebookId, config) } catch { /* handled */ }
             }}
           />
         )}
