@@ -2,6 +2,7 @@
 Chat routes — ask, history, persona
 """
 from __future__ import annotations
+import json
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from services.client import get_client
@@ -32,38 +33,46 @@ def _serialize_reference(ref) -> dict:
 @router.post("/{notebook_id}/chat")
 async def send_message(notebook_id: str, body: AskBody, client=Depends(get_client)):
     try:
-        # Use stored conversation_id for continuity unless caller overrides
         conv_id = body.conversation_id or _conversations.get(notebook_id)
+        print(f"[sidecar:chat] ask notebook_id={notebook_id} conv_id={conv_id} message={body.message!r}", flush=True)
+
         result = await client.chat.ask(
             notebook_id,
             body.message,
             conversation_id=conv_id,
         )
-        # Persist conversation_id for follow-ups
         _conversations[notebook_id] = result.conversation_id
 
-        # Build suggested follow-ups list — notebooklm-py doesn't expose them
-        # directly on AskResult; fall back to empty list gracefully.
+        print(f"[sidecar:chat] answer length={len(result.answer)} conversation_id={result.conversation_id}", flush=True)
+        print(f"[sidecar:chat] raw references attr={getattr(result, 'references', 'MISSING')}", flush=True)
+
         followups = []
         try:
             followups = list(getattr(result, "suggested_followups", []) or [])
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[sidecar:chat] followups error: {e}", flush=True)
 
         references = []
         try:
-            references = [_serialize_reference(r) for r in (result.references or [])]
-        except Exception:
-            pass
+            raw_refs = result.references or []
+            print(f"[sidecar:chat] references count={len(raw_refs)}", flush=True)
+            for i, r in enumerate(raw_refs):
+                print(f"[sidecar:chat]   ref[{i}] source_id={getattr(r,'source_id','?')} citation_number={getattr(r,'citation_number','?')} cited_text={getattr(r,'cited_text','?')!r}", flush=True)
+            references = [_serialize_reference(r) for r in raw_refs]
+        except Exception as e:
+            print(f"[sidecar:chat] references error: {e}", flush=True)
 
-        return {
+        payload = {
             "answer": result.answer,
             "conversation_id": result.conversation_id,
             "turn_number": getattr(result, "turn_number", 0),
             "references": references,
             "suggested_followups": followups,
         }
+        print(f"[sidecar:chat] returning payload keys={list(payload.keys())} references_serialized={json.dumps(references)}", flush=True)
+        return payload
     except Exception as e:
+        print(f"[sidecar:chat] exception: {e}", flush=True)
         raise HTTPException(status_code=500, detail={"error": "internal_error", "message": str(e)})
 
 

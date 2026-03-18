@@ -171,16 +171,25 @@ async fn sidecar_get(path: &str) -> Result<serde_json::Value, String> {
 
 async fn sidecar_post(path: &str, body: serde_json::Value) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
+    let url = format!("{}{}", SIDECAR_URL, path);
+    println!("[tauri] POST {} body={}", url, body);
     let res = client
-        .post(format!("{}{}", SIDECAR_URL, path))
+        .post(&url)
         .json(&body)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
-    if res.status().is_success() {
-        Ok(res.json().await.map_err(|e| e.to_string())?)
+        .map_err(|e| {
+            println!("[tauri] POST {} connection error: {}", url, e);
+            e.to_string()
+        })?;
+    let status = res.status();
+    if status.is_success() {
+        let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+        println!("[tauri] POST {} -> {} response={}", url, status, json);
+        Ok(json)
     } else {
         let err: serde_json::Value = res.json().await.unwrap_or(serde_json::json!({"error": "request_failed"}));
+        println!("[tauri] POST {} -> {} error={}", url, status, err);
         Err(err.to_string())
     }
 }
@@ -304,10 +313,16 @@ async fn get_source_fulltext(notebook_id: String, source_id: String) -> Result<s
 
 #[tauri::command]
 async fn send_message(notebook_id: String, message: String, conversation_id: Option<String>) -> Result<serde_json::Value, String> {
-    sidecar_post(
+    println!("[tauri:send_message] notebook_id={} conversation_id={:?} message={:?}", notebook_id, conversation_id, message);
+    let result = sidecar_post(
         &format!("/notebooks/{}/chat", notebook_id),
         serde_json::json!({ "message": message, "conversation_id": conversation_id }),
-    ).await
+    ).await;
+    match &result {
+        Ok(v) => println!("[tauri:send_message] success references={:?}", v.get("references")),
+        Err(e) => println!("[tauri:send_message] error: {}", e),
+    }
+    result
 }
 
 #[tauri::command]

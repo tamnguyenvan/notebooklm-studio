@@ -58,7 +58,7 @@ interface NotebookStore {
 export const useNotebookStore = create<NotebookStore>((set, get) => ({
   notebooks: [],
   activeNotebookId: null,
-  recentIds: loadRecents(),
+  recentIds: [],
   pinOrder: {},
   loading: false,
   error: null,

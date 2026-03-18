@@ -71,6 +71,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       const convId = get().conversationIds[notebookId]
       const result = await ipc.sendMessage(notebookId, text, convId)
 
+      console.debug('[chat] sendMessage result:', {
+        answer_length: result.answer.length,
+        conversation_id: result.conversation_id,
+        references: result.references,
+        suggested_followups: result.suggested_followups,
+      })
+
       const assistantMsg: ChatMessage = {
         id: pendingMsg.id,
         role: 'assistant',
