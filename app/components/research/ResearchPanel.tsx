@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Search, Globe, HardDrive, Import, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Search, Globe, HardDrive, Import, CheckCircle2, AlertCircle, Loader2, StickyNote } from 'lucide-react'
 import { useResearchStore, ResearchMode, ResearchDepth } from '../../stores/researchStore'
 import { useSourceStore } from '../../stores/sourceStore'
+import { useNotesStore } from '../../stores/notesStore'
 import { useToastStore } from '../../stores/toastStore'
 import { ws } from '../../lib/ws'
 import { ResearchResult } from '../../lib/ipc'
@@ -35,6 +36,7 @@ export function ResearchPanel({ notebookId }: Props) {
   } = useResearchStore()
 
   const { addSource, fetchSources } = useSourceStore()
+  const { prefillNote } = useNotesStore()
   const { show: showToast } = useToastStore()
 
   const [query, setQuery] = useState('')
@@ -42,6 +44,8 @@ export function ResearchPanel({ notebookId }: Props) {
   const [depth, setDepth] = useState<ResearchDepth>('fast')
   const [importingUrl, setImportingUrl] = useState<string | null>(null)
   const [importingMany, setImportingMany] = useState(false)
+  const [savingNoteUrl, setSavingNoteUrl] = useState<string | null>(null)
+  const [savingNotes, setSavingNotes] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const state = results[notebookId]
@@ -143,6 +147,47 @@ export function ResearchPanel({ notebookId }: Props) {
       showToast({ type: 'error', message: `Import failed: ${String(e)}` })
     } finally {
       setImportingMany(false)
+    }
+  }
+
+  // ── Save to Notes helpers ──────────────────────────────────────────────────
+
+  const resultToNoteContent = (result: ResearchResult) =>
+    `## ${result.title || result.url}\n\n**Source:** ${result.url}\n\n${result.snippet ?? ''}`
+
+  const handleSaveOneToNotes = async (result: ResearchResult) => {
+    if (savingNoteUrl === result.url) return
+    setSavingNoteUrl(result.url)
+    try {
+      await prefillNote(notebookId, resultToNoteContent(result), result.title || 'Research note')
+      showToast({ type: 'success', message: `"${result.title || result.url}" saved to Notes` })
+    } catch (e) {
+      showToast({ type: 'error', message: `Save failed: ${String(e)}` })
+    } finally {
+      setSavingNoteUrl(null)
+    }
+  }
+
+  const handleSaveToNotes = async () => {
+    if (savingNotes) return
+    const targets = selectedCount > 0
+      ? sources.filter((s) => selectedSet.has(s.url))
+      : sources
+    if (targets.length === 0) return
+    setSavingNotes(true)
+    try {
+      const combined = targets
+        .map((r) => resultToNoteContent(r))
+        .join('\n\n---\n\n')
+      const title = selectedCount > 0
+        ? `Research: ${targets.length} selected result${targets.length !== 1 ? 's' : ''}`
+        : `Research: ${state?.query ?? 'results'}`
+      await prefillNote(notebookId, combined, title)
+      showToast({ type: 'success', message: `${targets.length} result${targets.length !== 1 ? 's' : ''} saved to Notes` })
+    } catch (e) {
+      showToast({ type: 'error', message: `Save failed: ${String(e)}` })
+    } finally {
+      setSavingNotes(false)
     }
   }
 
@@ -265,6 +310,18 @@ export function ResearchPanel({ notebookId }: Props) {
                 {importingMany ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Import className="w-3.5 h-3.5" />}
                 {selectedCount > 0 ? `Import Selected (${selectedCount})` : `Import All (${unimportedCount})`}
               </button>
+              {/* Save to Notes */}
+              <button
+                onClick={handleSaveToNotes}
+                disabled={savingNotes || sources.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border"
+                style={{ borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', background: 'transparent', minWidth: 130 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-accent-subtle)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              >
+                {savingNotes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <StickyNote className="w-3.5 h-3.5" />}
+                {selectedCount > 0 ? `Save Selected (${selectedCount})` : `Save All to Notes`}
+              </button>
             </div>
           </motion.div>
         )}
@@ -313,8 +370,10 @@ export function ResearchPanel({ notebookId }: Props) {
                 isSelected={selectedSet.has(result.url)}
                 isImported={importedSet.has(result.url)}
                 isImporting={importingUrl === result.url}
+                isSavingNote={savingNoteUrl === result.url}
                 onToggle={() => toggleSelect(notebookId, result.url)}
                 onImport={() => handleImportOne(result)}
+                onSaveToNotes={() => handleSaveOneToNotes(result)}
                 index={i}
               />
             ))}
@@ -332,12 +391,14 @@ interface ResultRowProps {
   isSelected: boolean
   isImported: boolean
   isImporting: boolean
+  isSavingNote: boolean
   onToggle: () => void
   onImport: () => void
+  onSaveToNotes: () => void
   index: number
 }
 
-function ResultRow({ result, isSelected, isImported, isImporting, onToggle, onImport, index }: ResultRowProps) {
+function ResultRow({ result, isSelected, isImported, isImporting, isSavingNote, onToggle, onImport, onSaveToNotes, index }: ResultRowProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -396,7 +457,7 @@ function ResultRow({ result, isSelected, isImported, isImporting, onToggle, onIm
           </div>
 
           {/* Action */}
-          <div className="flex-shrink-0 mt-0.5">
+          <div className="flex-shrink-0 mt-0.5 flex items-center gap-1.5">
             {isImported ? (
               <span
                 className="text-xs px-2 py-0.5 rounded"
@@ -439,6 +500,30 @@ function ResultRow({ result, isSelected, isImported, isImporting, onToggle, onIm
                 Import
               </button>
             )}
+            {/* Save to Notes */}
+            <button
+              onClick={onSaveToNotes}
+              disabled={isSavingNote}
+              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium transition-colors border"
+              style={{
+                borderColor: 'var(--color-separator)',
+                color: 'var(--color-text-primary)',
+                background: 'transparent',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--color-accent-subtle)'
+                e.currentTarget.style.color = 'var(--color-accent)'
+                e.currentTarget.style.borderColor = 'var(--color-accent)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = 'var(--color-text-primary)'
+                e.currentTarget.style.borderColor = 'var(--color-separator)'
+              }}
+            >
+              {isSavingNote ? <Loader2 className="w-3 h-3 animate-spin" /> : <StickyNote className="w-3 h-3" />}
+              Save
+            </button>
           </div>
         </div>
       </div>

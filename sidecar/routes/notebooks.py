@@ -3,6 +3,7 @@ Notebook routes — list, create, rename, delete, pin
 """
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -10,10 +11,20 @@ from services.client import get_client
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
 
-# ── Pin state persistence ─────────────────────────────────────────────────────
-# Stored in the same directory as this file so it survives sidecar restarts.
-_PIN_FILE = Path(__file__).parent.parent / "data" / "pinned.json"
-_EMOJI_FILE = Path(__file__).parent.parent / "data" / "emojis.json"
+# ── Stable data directory ─────────────────────────────────────────────────────
+# In production (Tauri), DATA_DIR env var is set to app_data_dir by Rust.
+# In dev, fall back to sidecar/data/ relative to this file.
+def _data_dir() -> Path:
+    env = os.environ.get("DATA_DIR")
+    if env:
+        p = Path(env)
+    else:
+        p = Path(__file__).parent.parent / "data"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+_PIN_FILE  = _data_dir() / "pinned.json"
+_EMOJI_FILE = _data_dir() / "emojis.json"
 
 def _load_pinned() -> dict[str, int]:
     """Returns {notebook_id: pin_timestamp} — higher = pinned later = shown first."""

@@ -19,6 +19,7 @@ import { GenerateModal } from '../studio/GenerateModal'
 import { ws } from '../../lib/ws'
 import { useShortcut } from '../../lib/useShortcut'
 import { useArtifactStore } from '../../stores/artifactStore'
+import { useSourceStore } from '../../stores/sourceStore'
 import { ArtifactType, GenerateConfig } from '../../lib/ipc'
 
 type TabId = 'chat' | 'sources' | 'studio' | 'research' | 'notes'
@@ -38,6 +39,8 @@ interface Props {
 export function NotebookScreen({ notebookId }: Props) {
   const { notebooks, setActiveNotebook, renameNotebook } = useNotebookStore()
   const { closeCanvas, canvasItem, generate, fetchArtifacts } = useArtifactStore()
+  const { sources: allSources } = useSourceStore()
+  const notebookSources = (allSources[notebookId] ?? []).filter((s) => s.status === 'ready')
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [shareOpen, setShareOpen] = useState(false)
   const [addSourceOpen, setAddSourceOpen] = useState(false)
@@ -249,6 +252,7 @@ export function NotebookScreen({ notebookId }: Props) {
         {generateType && (
           <GenerateModal
             artifactType={generateType}
+            sources={notebookSources}
             onClose={() => setGenerateType(null)}
             onGenerate={async (config: GenerateConfig) => {
               setGenerateType(null)

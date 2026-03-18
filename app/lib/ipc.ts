@@ -77,15 +77,15 @@ export interface Artifact {
 }
 
 export type GenerateConfig =
-  | { type: 'audio'; format: 'deep_dive' | 'brief' | 'critique' | 'debate'; length: 'short' | 'medium' | 'long'; language: string; instructions?: string }
-  | { type: 'video'; format: 'standard' | 'shorts'; style: string }
-  | { type: 'slides'; format: 'detailed' | 'presenter'; length: 'short' | 'medium' | 'long'; instructions?: string }
-  | { type: 'quiz'; quantity: 'few' | 'standard' | 'many'; difficulty: 'easy' | 'medium' | 'hard' | 'mixed' }
-  | { type: 'flashcards'; quantity: 'few' | 'standard' | 'many'; difficulty: 'easy' | 'medium' | 'hard' | 'mixed' }
-  | { type: 'infographic'; orientation: 'portrait' | 'landscape' | 'square'; detail: 'overview' | 'standard' | 'detailed' }
-  | { type: 'report'; template: 'briefing' | 'study_guide' | 'blog_post' | 'custom'; extra_instructions?: string }
-  | { type: 'data_table'; structure_prompt: string }
-  | { type: 'mind_map' }
+  | { type: 'audio'; format: 'deep_dive' | 'brief' | 'critique' | 'debate'; length: 'short' | 'medium' | 'long'; language: string; instructions?: string; source_ids?: string[] }
+  | { type: 'video'; format: 'standard' | 'shorts'; style: string; language?: string; instructions?: string; source_ids?: string[] }
+  | { type: 'slides'; format: 'detailed' | 'presenter'; length: 'short' | 'medium'; language?: string; instructions?: string; source_ids?: string[] }
+  | { type: 'quiz'; quantity: 'few' | 'standard' | 'many'; difficulty: 'easy' | 'medium' | 'hard' | 'mixed'; instructions?: string; source_ids?: string[] }
+  | { type: 'flashcards'; quantity: 'few' | 'standard' | 'many'; difficulty: 'easy' | 'medium' | 'hard' | 'mixed'; instructions?: string; source_ids?: string[] }
+  | { type: 'infographic'; orientation: 'portrait' | 'landscape' | 'square'; detail: 'overview' | 'standard' | 'detailed'; language?: string; instructions?: string; source_ids?: string[] }
+  | { type: 'report'; template: 'briefing' | 'study_guide' | 'blog_post' | 'custom'; extra_instructions?: string; language?: string; source_ids?: string[] }
+  | { type: 'data_table'; structure_prompt: string; language?: string; source_ids?: string[] }
+  | { type: 'mind_map'; source_ids?: string[] }
 
 // ── Download / Library types ──────────────────────────────────────────────────
 

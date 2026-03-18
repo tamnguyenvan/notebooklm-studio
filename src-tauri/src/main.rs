@@ -34,10 +34,18 @@ fn spawn_and_monitor_sidecar(app_handle: tauri::AppHandle) -> Result<(), String>
         }
     }
 
+    // Resolve a stable data directory for the sidecar to persist its files
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
     let sidecar_command = app_handle
         .shell()
         .sidecar("main")
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .env("DATA_DIR", &data_dir);
     let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
 
     if let Some(state) = app_handle.try_state::<Arc<Mutex<Option<CommandChild>>>>() {

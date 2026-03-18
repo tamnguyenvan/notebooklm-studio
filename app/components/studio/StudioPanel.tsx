@@ -13,6 +13,7 @@ import { useArtifactStore } from '../../stores/artifactStore'
 import { useToastStore } from '../../stores/toastStore'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { useDownloadStore } from '../../stores/downloadStore'
+import { useSourceStore } from '../../stores/sourceStore'
 import { ws } from '../../lib/ws'
 import { ArtifactType, Artifact, GenerateConfig } from '../../lib/ipc'
 import { ipc } from '../../lib/ipc'
@@ -61,6 +62,8 @@ export function StudioPanel({ notebookId }: Props) {
   const { show } = useToastStore()
   const { notebooks } = useNotebookStore()
   const { addDownload } = useDownloadStore()
+  const { sources: allSources } = useSourceStore()
+  const notebookSources = (allSources[notebookId] ?? []).filter((s) => s.status === 'ready')
   const [modalType, setModalType] = useState<ArtifactType | null>(null)
   // Track when each task started (for timeout detection)
   const [taskStartTimes] = useState<Map<string, number>>(new Map())
@@ -233,6 +236,7 @@ export function StudioPanel({ notebookId }: Props) {
         {modalType && (
           <GenerateModal
             artifactType={modalType}
+            sources={notebookSources}
             onClose={() => setModalType(null)}
             onGenerate={handleGenerate}
           />

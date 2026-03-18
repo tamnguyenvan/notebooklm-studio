@@ -4,12 +4,13 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AP = AnimatePresence as any
-import { X } from 'lucide-react'
-import { ArtifactType, GenerateConfig } from '../../lib/ipc'
+import { X, Check } from 'lucide-react'
+import { ArtifactType, GenerateConfig, Source } from '../../lib/ipc'
 import { Select } from '../ui/Dropdown'
 
 interface Props {
   artifactType: ArtifactType
+  sources: Source[]
   onClose: () => void
   onGenerate: (config: GenerateConfig) => void
 }
@@ -64,14 +65,96 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function AudioForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+/** Checkbox list to pick a subset of sources. Empty selection = all sources. */
+function SourceSelector({
+  sources,
+  selected,
+  onChange,
+}: {
+  sources: Source[]
+  selected: string[]
+  onChange: (ids: string[]) => void
+}) {
+  if (sources.length === 0) return null
+  const hasSelection = selected.length > 0
+
+  const toggle = (id: string) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter((s) => s !== id))
+    } else {
+      onChange([...selected, id])
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {/* Label row — always same height */}
+      <div className="flex items-center justify-between" style={{ minHeight: 18 }}>
+        <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          {hasSelection ? `Sources (${selected.length} selected)` : 'Sources (all)'}
+        </label>
+        <button
+          onClick={() => onChange([])}
+          className="text-xs transition-opacity"
+          style={{
+            color: 'var(--color-accent)',
+            opacity: hasSelection ? 1 : 0,
+            pointerEvents: hasSelection ? 'auto' : 'none',
+          }}
+        >
+          Clear selection
+        </button>
+      </div>
+
+      <div
+        className="rounded-lg border overflow-hidden"
+        style={{ borderColor: 'var(--color-separator)', maxHeight: 140, overflowY: 'auto' }}
+      >
+        {sources.map((src, i) => {
+          const checked = selected.includes(src.id)
+          return (
+            <button
+              key={src.id}
+              onClick={() => toggle(src.id)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
+              style={{
+                borderTop: i > 0 ? '1px solid var(--color-separator)' : undefined,
+                background: checked ? 'var(--color-accent-subtle)' : 'transparent',
+              }}
+              onMouseEnter={(e) => { if (!checked) e.currentTarget.style.background = 'var(--color-app-bg)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = checked ? 'var(--color-accent-subtle)' : 'transparent' }}
+            >
+              <div
+                className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center"
+                style={{
+                  border: checked ? 'none' : '1.5px solid var(--color-separator)',
+                  background: checked ? 'var(--color-accent)' : 'transparent',
+                }}
+              >
+                {checked && <Check size={10} color="#fff" strokeWidth={3} />}
+              </div>
+              <span className="text-xs truncate" style={{ color: 'var(--color-text-primary)' }}>
+                {src.title}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Form components ───────────────────────────────────────────────────────────
+
+function AudioForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
   const [format, setFormat] = useState<'deep_dive' | 'brief' | 'critique' | 'debate'>('deep_dive')
   const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium')
   const [language, setLanguage] = useState('en')
   const [instructions, setInstructions] = useState('')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Audio Overview" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'audio', format, length, language, instructions: instructions || undefined })}>
+      onGenerate={() => onGenerate({ type: 'audio', format, length, language, instructions: instructions || undefined, source_ids: sourceIds.length ? sourceIds : undefined })}>
       <Field label="Format">
         <SegmentedControl
           options={[{ value: 'deep_dive', label: 'Deep Dive' }, { value: 'brief', label: 'Brief' }, { value: 'critique', label: 'Critique' }, { value: 'debate', label: 'Debate' }]}
@@ -99,16 +182,20 @@ function AudioForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) =>
           className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
           style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
       </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
 
-function VideoForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+function VideoForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
   const [format, setFormat] = useState<'standard' | 'shorts'>('standard')
   const [style, setStyle] = useState('auto')
+  const [language, setLanguage] = useState('en')
+  const [instructions, setInstructions] = useState('')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Video Overview" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'video', format, style })}>
+      onGenerate={() => onGenerate({ type: 'video', format, style, language, instructions: instructions || undefined, source_ids: sourceIds.length ? sourceIds : undefined })}>
       <Field label="Format">
         <SegmentedControl
           options={[{ value: 'standard', label: 'Standard' }, { value: 'shorts', label: 'Shorts' }]}
@@ -130,27 +217,13 @@ function VideoForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) =>
           ))}
         </div>
       </Field>
-    </ModalShell>
-  )
-}
-
-function SlidesForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
-  const [format, setFormat] = useState<'detailed' | 'presenter'>('detailed')
-  const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium')
-  const [instructions, setInstructions] = useState('')
-  return (
-    <ModalShell title="Generate Slide Deck" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'slides', format, length, instructions: instructions || undefined })}>
-      <Field label="Format">
-        <SegmentedControl
-          options={[{ value: 'detailed', label: 'Detailed' }, { value: 'presenter', label: 'Presenter' }]}
-          value={format} onChange={setFormat}
-        />
-      </Field>
-      <Field label="Length">
-        <SegmentedControl
-          options={[{ value: 'short', label: 'Short' }, { value: 'medium', label: 'Default' }, { value: 'long', label: 'Long' }]}
-          value={length} onChange={setLength}
+      <Field label="Language">
+        <Select
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+          value={language}
+          onChange={setLanguage}
+          triggerClassName="w-full"
+          triggerStyle={{ justifyContent: 'space-between' }}
         />
       </Field>
       <Field label="Instructions (optional)">
@@ -159,16 +232,60 @@ function SlidesForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) =
           className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
           style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
       </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
 
-function QuizForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+function SlidesForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+  const [format, setFormat] = useState<'detailed' | 'presenter'>('detailed')
+  const [length, setLength] = useState<'short' | 'medium'>('medium')
+  const [language, setLanguage] = useState('en')
+  const [instructions, setInstructions] = useState('')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
+  return (
+    <ModalShell title="Generate Slide Deck" onClose={onClose}
+      onGenerate={() => onGenerate({ type: 'slides', format, length, language, instructions: instructions || undefined, source_ids: sourceIds.length ? sourceIds : undefined })}>
+      <Field label="Format">
+        <SegmentedControl
+          options={[{ value: 'detailed', label: 'Detailed' }, { value: 'presenter', label: 'Presenter' }]}
+          value={format} onChange={setFormat}
+        />
+      </Field>
+      <Field label="Length">
+        <SegmentedControl
+          options={[{ value: 'short', label: 'Short' }, { value: 'medium', label: 'Default' }]}
+          value={length} onChange={setLength}
+        />
+      </Field>
+      <Field label="Language">
+        <Select
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+          value={language}
+          onChange={setLanguage}
+          triggerClassName="w-full"
+          triggerStyle={{ justifyContent: 'space-between' }}
+        />
+      </Field>
+      <Field label="Instructions (optional)">
+        <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)}
+          rows={3} placeholder="Optional extra instructions…"
+          className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
+          style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
+      </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
+    </ModalShell>
+  )
+}
+
+function QuizForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
   const [quantity, setQuantity] = useState<'few' | 'standard' | 'many'>('standard')
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('medium')
+  const [instructions, setInstructions] = useState('')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Quiz" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'quiz', quantity, difficulty })}>
+      onGenerate={() => onGenerate({ type: 'quiz', quantity, difficulty, instructions: instructions || undefined, source_ids: sourceIds.length ? sourceIds : undefined })}>
       <Field label="Quantity">
         <SegmentedControl
           options={[{ value: 'few', label: 'Few (5)' }, { value: 'standard', label: 'Standard (10)' }, { value: 'many', label: 'Many (20)' }]}
@@ -181,16 +298,25 @@ function QuizForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => 
           value={difficulty} onChange={setDifficulty}
         />
       </Field>
+      <Field label="Instructions (optional)">
+        <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)}
+          rows={3} placeholder="Optional extra instructions…"
+          className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
+          style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
+      </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
 
-function FlashcardsForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+function FlashcardsForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
   const [quantity, setQuantity] = useState<'few' | 'standard' | 'many'>('standard')
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('medium')
+  const [instructions, setInstructions] = useState('')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Flashcards" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'flashcards', quantity, difficulty })}>
+      onGenerate={() => onGenerate({ type: 'flashcards', quantity, difficulty, instructions: instructions || undefined, source_ids: sourceIds.length ? sourceIds : undefined })}>
       <Field label="Quantity">
         <SegmentedControl
           options={[{ value: 'few', label: 'Few' }, { value: 'standard', label: 'Standard' }, { value: 'many', label: 'Many' }]}
@@ -203,16 +329,26 @@ function FlashcardsForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfi
           value={difficulty} onChange={setDifficulty}
         />
       </Field>
+      <Field label="Instructions (optional)">
+        <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)}
+          rows={3} placeholder="Optional extra instructions…"
+          className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
+          style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
+      </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
 
-function InfographicForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+function InfographicForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape' | 'square'>('portrait')
   const [detail, setDetail] = useState<'overview' | 'standard' | 'detailed'>('standard')
+  const [language, setLanguage] = useState('en')
+  const [instructions, setInstructions] = useState('')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Infographic" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'infographic', orientation, detail })}>
+      onGenerate={() => onGenerate({ type: 'infographic', orientation, detail, language, instructions: instructions || undefined, source_ids: sourceIds.length ? sourceIds : undefined })}>
       <Field label="Orientation">
         <SegmentedControl
           options={[{ value: 'portrait', label: 'Portrait' }, { value: 'landscape', label: 'Landscape' }, { value: 'square', label: 'Square' }]}
@@ -225,16 +361,34 @@ function InfographicForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConf
           value={detail} onChange={setDetail}
         />
       </Field>
+      <Field label="Language">
+        <Select
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+          value={language}
+          onChange={setLanguage}
+          triggerClassName="w-full"
+          triggerStyle={{ justifyContent: 'space-between' }}
+        />
+      </Field>
+      <Field label="Instructions (optional)">
+        <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)}
+          rows={3} placeholder="Optional extra instructions…"
+          className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
+          style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
+      </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
 
-function ReportForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+function ReportForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
   const [template, setTemplate] = useState<'briefing' | 'study_guide' | 'blog_post' | 'custom'>('study_guide')
   const [extra, setExtra] = useState('')
+  const [language, setLanguage] = useState('en')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Report" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'report', template, extra_instructions: extra || undefined })}>
+      onGenerate={() => onGenerate({ type: 'report', template, extra_instructions: extra || undefined, language, source_ids: sourceIds.length ? sourceIds : undefined })}>
       <Field label="Template">
         <SegmentedControl
           options={[{ value: 'briefing', label: 'Briefing' }, { value: 'study_guide', label: 'Study Guide' }, { value: 'blog_post', label: 'Blog Post' }, { value: 'custom', label: 'Custom' }]}
@@ -247,15 +401,27 @@ function ReportForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) =
           className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
           style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
       </Field>
+      <Field label="Language">
+        <Select
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+          value={language}
+          onChange={setLanguage}
+          triggerClassName="w-full"
+          triggerStyle={{ justifyContent: 'space-between' }}
+        />
+      </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
 
-function DataTableForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+function DataTableForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
   const [prompt, setPrompt] = useState('')
+  const [language, setLanguage] = useState('en')
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Data Table" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'data_table', structure_prompt: prompt })}
+      onGenerate={() => onGenerate({ type: 'data_table', structure_prompt: prompt, language, source_ids: sourceIds.length ? sourceIds : undefined })}
       disableGenerate={!prompt.trim()}>
       <Field label="Describe the table structure">
         <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)}
@@ -263,20 +429,34 @@ function DataTableForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig
           className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
           style={{ background: 'var(--color-app-bg)', borderColor: 'var(--color-separator)', color: 'var(--color-text-primary)', outline: 'none' }} />
       </Field>
+      <Field label="Language">
+        <Select
+          options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
+          value={language}
+          onChange={setLanguage}
+          triggerClassName="w-full"
+          triggerStyle={{ justifyContent: 'space-between' }}
+        />
+      </Field>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
 
-function MindMapForm({ onGenerate, onClose }: { onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+function MindMapForm({ sources, onGenerate, onClose }: { sources: Source[]; onGenerate: (c: GenerateConfig) => void; onClose: () => void }) {
+  const [sourceIds, setSourceIds] = useState<string[]>([])
   return (
     <ModalShell title="Generate Mind Map" onClose={onClose}
-      onGenerate={() => onGenerate({ type: 'mind_map' })}>
+      onGenerate={() => onGenerate({ type: 'mind_map', source_ids: sourceIds.length ? sourceIds : undefined })}>
       <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-        A mind map will be generated from all sources in this notebook. No configuration needed.
+        A mind map will be generated from your notebook sources. Optionally select specific sources below.
       </p>
+      <SourceSelector sources={sources} selected={sourceIds} onChange={setSourceIds} />
     </ModalShell>
   )
 }
+
+// ── Modal shell ───────────────────────────────────────────────────────────────
 
 function ModalShell({
   title, onClose, onGenerate, disableGenerate, children,
@@ -305,6 +485,7 @@ function ModalShell({
         className="flex flex-col rounded-xl overflow-hidden"
         style={{
           width: '480px',
+          height: 'min-content',
           maxHeight: '80vh',
           background: 'var(--color-elevated)',
           boxShadow: 'var(--shadow-xl)',
@@ -321,7 +502,7 @@ function ModalShell({
         </div>
 
         {/* Body */}
-        <div className="flex flex-col gap-4 p-5 overflow-y-auto">{children}</div>
+        <div className="flex flex-col gap-4 p-5 overflow-y-auto" style={{ minHeight: 0 }}>{children}</div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: 'var(--color-separator)' }}>
@@ -342,8 +523,10 @@ function ModalShell({
   )
 }
 
-export function GenerateModal({ artifactType, onClose, onGenerate }: Props) {
-  const props = { onGenerate, onClose }
+// ── Export ────────────────────────────────────────────────────────────────────
+
+export function GenerateModal({ artifactType, sources, onClose, onGenerate }: Props) {
+  const props = { sources, onGenerate, onClose }
   return (
     <AP>
       {(() => {

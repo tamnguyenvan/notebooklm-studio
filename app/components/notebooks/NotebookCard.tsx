@@ -127,8 +127,15 @@ export function NotebookCard({ notebook, onClick }: Props) {
         </span>
       )}
 
-      {/* Emoji */}
-      <div className="mb-2 text-3xl leading-none">
+      {/* Emoji — click to change */}
+      <div
+        className="mb-2 text-3xl leading-none w-10 h-10 flex items-center justify-center rounded-lg transition-colors cursor-pointer"
+        data-no-open
+        onClick={(e) => { e.stopPropagation(); setEmojiPickerOpen(true) }}
+        title="Change emoji"
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-separator)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      >
         {notebook.emoji ?? '📓'}
       </div>
 

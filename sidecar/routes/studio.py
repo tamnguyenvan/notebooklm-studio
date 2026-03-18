@@ -147,6 +147,9 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
         _check_cancelled(task_id)
         await runner.update_progress(task_id, 5, "Starting…")
 
+        # source_ids — None means "all sources"
+        source_ids: list[str] | None = config.get("source_ids") or None
+
         try:
             if artifact_type == "audio":
                 from notebooklm import AudioFormat, AudioLength
@@ -167,6 +170,7 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     audio_length=len_map.get(config.get("length", "medium"), AudioLength.DEFAULT),
                     language=config.get("language", "en"),
                     instructions=config.get("instructions") or None,
+                    source_ids=source_ids,
                 )
 
             elif artifact_type == "video":
@@ -192,6 +196,7 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     video_style=style_map.get(config.get("style", "auto"), VideoStyle.AUTO_SELECT),
                     language=config.get("language", "en"),
                     instructions=config.get("instructions") or None,
+                    source_ids=source_ids,
                 )
 
             elif artifact_type == "slides":
@@ -204,7 +209,6 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                 len_map = {
                     "short":  SlideDeckLength.SHORT,
                     "medium": SlideDeckLength.DEFAULT,
-                    "long":   SlideDeckLength.DEFAULT,
                 }
                 status = await client.artifacts.generate_slide_deck(
                     notebook_id,
@@ -212,6 +216,7 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     slide_length=len_map.get(config.get("length", "medium"), SlideDeckLength.DEFAULT),
                     language=config.get("language", "en"),
                     instructions=config.get("instructions") or None,
+                    source_ids=source_ids,
                 )
 
             elif artifact_type == "quiz":
@@ -232,6 +237,7 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     quantity=qty_map.get(config.get("quantity", "standard"), QuizQuantity.STANDARD),
                     difficulty=diff_map.get(config.get("difficulty", "medium"), QuizDifficulty.MEDIUM),
                     instructions=config.get("instructions") or None,
+                    source_ids=source_ids,
                 )
 
             elif artifact_type == "flashcards":
@@ -252,6 +258,7 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     quantity=qty_map.get(config.get("quantity", "standard"), QuizQuantity.STANDARD),
                     difficulty=diff_map.get(config.get("difficulty", "medium"), QuizDifficulty.MEDIUM),
                     instructions=config.get("instructions") or None,
+                    source_ids=source_ids,
                 )
 
             elif artifact_type == "infographic":
@@ -272,6 +279,7 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     detail_level=detail_map.get(config.get("detail", "standard"), InfographicDetail.STANDARD),
                     language=config.get("language", "en"),
                     instructions=config.get("instructions") or None,
+                    source_ids=source_ids,
                 )
                 # InfographicStyle is optional — only pass if the library exposes it
                 try:
@@ -303,6 +311,7 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     extra_instructions=extra if report_fmt != ReportFormat.CUSTOM else None,
                     custom_prompt=extra if report_fmt == ReportFormat.CUSTOM else None,
                     language=config.get("language", "en"),
+                    source_ids=source_ids,
                 )
 
             elif artifact_type == "data_table":
@@ -311,11 +320,12 @@ async def generate(notebook_id: str, body: GenerateRequest, client=Depends(get_c
                     notebook_id,
                     instructions=config.get("structure_prompt") or config.get("instructions") or None,
                     language=config.get("language", "en"),
+                    source_ids=source_ids,
                 )
 
             elif artifact_type == "mind_map":
                 # Returns dict {"mind_map": ..., "note_id": ...}, not a GenerationStatus
-                await client.artifacts.generate_mind_map(notebook_id)
+                await client.artifacts.generate_mind_map(notebook_id, source_ids=source_ids)
                 await runner.update_progress(task_id, 100, "Done")
                 return {"artifact_type": artifact_type, "notebook_id": notebook_id}
 
