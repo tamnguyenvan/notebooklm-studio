@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { MoreHorizontal, Pin, PinOff, Trash2, Pencil, Share2 } from 'lucide-react'
+import { MoreHorizontal, Pin, PinOff, Trash2, Pencil, Share2, Smile } from 'lucide-react'
 import { Notebook } from '../../lib/ipc'
 import { useNotebookStore } from '../../stores/notebookStore'
 import { useSourceStore } from '../../stores/sourceStore'
 import { useToastStore } from '../../stores/toastStore'
 import { ShareModal } from '../sharing/ShareModal'
+
+const EMOJIS = ['📓','📔','📒','📕','📗','📘','📙','🗒️','📋','📄','📑','🗂️',
+  '💡','🔬','🧪','🎯','🚀','🌍','🎨','🎵','💻','🤖','🧠','⚡']
 
 function timeAgo(iso: string | null): string {
   if (!iso) return ''
@@ -27,7 +30,7 @@ interface Props {
 }
 
 export function NotebookCard({ notebook, onClick }: Props) {
-  const { renameNotebook, deleteNotebook, pinNotebook, fetchNotebooks } = useNotebookStore()
+  const { renameNotebook, deleteNotebook, pinNotebook, fetchNotebooks, setNotebookEmoji } = useNotebookStore()
   const { show } = useToastStore()
   const { sources, fetchSources } = useSourceStore()
   const sourceCount = sources[notebook.id]?.length ?? notebook.source_count
@@ -39,6 +42,7 @@ export function NotebookCard({ notebook, onClick }: Props) {
     }
   }, [notebook.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [menuOpen, setMenuOpen] = useState(false)
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(notebook.title)
   const [hovered, setHovered] = useState(false)
@@ -196,6 +200,8 @@ export function NotebookCard({ notebook, onClick }: Props) {
               >
                 <MenuItem icon={<Pencil size={13} />} label="Rename" onClick={() => { setMenuOpen(false); setRenaming(true) }} />
                 <div style={{ height: 1, background: 'var(--color-separator)', margin: '4px 0' }} />
+                <MenuItem icon={<Smile size={13} />} label="Change emoji" onClick={() => { setMenuOpen(false); setEmojiPickerOpen(true) }} />
+                <div style={{ height: 1, background: 'var(--color-separator)', margin: '4px 0' }} />
                 <MenuItem icon={<Share2 size={13} />} label="Share" onClick={() => { setMenuOpen(false); setShareOpen(true) }} />
                 <div style={{ height: 1, background: 'var(--color-separator)', margin: '4px 0' }} />
                 <MenuItem
@@ -216,6 +222,13 @@ export function NotebookCard({ notebook, onClick }: Props) {
         notebookId={notebook.id}
         notebookTitle={notebook.title}
         onClose={() => setShareOpen(false)}
+      />
+    )}
+    {emojiPickerOpen && (
+      <EmojiPickerModal
+        current={notebook.emoji ?? '📓'}
+        onSelect={(e) => { setNotebookEmoji(notebook.id, e); setEmojiPickerOpen(false) }}
+        onClose={() => setEmojiPickerOpen(false)}
       />
     )}
     </>
@@ -241,5 +254,51 @@ function MenuItem({
       {icon}
       {label}
     </button>
+  )
+}
+
+function EmojiPickerModal({ current, onSelect, onClose }: {
+  current: string
+  onSelect: (emoji: string) => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
+      onClick={onClose}
+    >
+      <div
+        className="rounded-2xl p-4 w-64"
+        style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)', border: '1px solid var(--color-separator)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-tertiary)' }}>
+          Choose icon
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {EMOJIS.map((e) => (
+            <button
+              key={e}
+              onClick={() => onSelect(e)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all"
+              style={{
+                background: e === current ? 'var(--color-accent-subtle)' : 'transparent',
+                outline: e === current ? '2px solid var(--color-accent)' : 'none',
+                outlineOffset: '-1px',
+              }}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }

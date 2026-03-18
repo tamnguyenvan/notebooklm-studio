@@ -52,6 +52,7 @@ interface NotebookStore {
   pinNotebook: (id: string, pinned: boolean) => Promise<void>
   setActiveNotebook: (id: string | null) => void
   removeRecent: (id: string) => void
+  setNotebookEmoji: (id: string, emoji: string) => Promise<void>
   _applyOptimistic: (notebooks: Notebook[]) => void
 }
 
@@ -142,6 +143,16 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
     const recents = get().recentIds.filter((r) => r !== id)
     void saveRecents(recents)
     set({ recentIds: recents })
+  },
+
+  setNotebookEmoji: async (id, emoji) => {
+    // Optimistic update
+    set((s) => ({ notebooks: s.notebooks.map((n) => n.id === id ? { ...n, emoji } : n) }))
+    try {
+      await ipc.setNotebookEmoji(id, emoji)
+    } catch {
+      // non-fatal — emoji is local-only anyway
+    }
   },
 
   _applyOptimistic: (notebooks) => set({ notebooks }),

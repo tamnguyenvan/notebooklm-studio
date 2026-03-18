@@ -250,6 +250,11 @@ async fn pin_notebook(id: String, pinned: bool) -> Result<serde_json::Value, Str
     sidecar_put(&format!("/notebooks/{}/pin", id), serde_json::json!({ "pinned": pinned })).await
 }
 
+#[tauri::command]
+async fn set_notebook_emoji(id: String, emoji: String) -> Result<serde_json::Value, String> {
+    sidecar_put(&format!("/notebooks/{}/emoji", id), serde_json::json!({ "emoji": emoji })).await
+}
+
 // ── source commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -669,6 +674,7 @@ fn main() {
             rename_notebook,
             delete_notebook,
             pin_notebook,
+            set_notebook_emoji,
             list_sources,
             add_source_url,
             add_source_youtube,

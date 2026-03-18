@@ -13,6 +13,7 @@ router = APIRouter(prefix="/notebooks", tags=["notebooks"])
 # ── Pin state persistence ─────────────────────────────────────────────────────
 # Stored in the same directory as this file so it survives sidecar restarts.
 _PIN_FILE = Path(__file__).parent.parent / "data" / "pinned.json"
+_EMOJI_FILE = Path(__file__).parent.parent / "data" / "emojis.json"
 
 def _load_pinned() -> dict[str, int]:
     """Returns {notebook_id: pin_timestamp} — higher = pinned later = shown first."""
@@ -31,7 +32,24 @@ def _save_pinned(data: dict[str, int]) -> None:
     except Exception:
         pass
 
+def _load_emojis() -> dict[str, str]:
+    try:
+        _EMOJI_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if _EMOJI_FILE.exists():
+            return json.loads(_EMOJI_FILE.read_text())
+    except Exception:
+        pass
+    return {}
+
+def _save_emojis(data: dict[str, str]) -> None:
+    try:
+        _EMOJI_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _EMOJI_FILE.write_text(json.dumps(data))
+    except Exception:
+        pass
+
 _pinned: dict[str, int] = _load_pinned()
+_emojis: dict[str, str] = _load_emojis()
 
 
 class CreateNotebookBody(BaseModel):
@@ -45,6 +63,10 @@ class RenameNotebookBody(BaseModel):
 
 class PinNotebookBody(BaseModel):
     pinned: bool
+
+
+class EmojiBody(BaseModel):
+    emoji: str
 
 
 @router.get("")
@@ -61,6 +83,9 @@ async def create_notebook(body: CreateNotebookBody, client=Depends(get_client)):
     try:
         title = body.title.strip() or "Untitled notebook"
         nb = await client.notebooks.create(title)
+        if body.emoji:
+            _emojis[nb.id] = body.emoji
+            _save_emojis(_emojis)
         return _serialize(nb)
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": "internal_error", "message": str(e)})
@@ -99,6 +124,13 @@ async def pin_notebook(notebook_id: str, body: PinNotebookBody):
     return {"status": "ok", "pinned": notebook_id in _pinned}
 
 
+@router.put("/{notebook_id}/emoji")
+async def set_emoji(notebook_id: str, body: EmojiBody):
+    _emojis[notebook_id] = body.emoji
+    _save_emojis(_emojis)
+    return {"status": "ok", "emoji": body.emoji}
+
+
 def _serialize(nb) -> dict:
     """Convert a notebooklm-py Notebook dataclass to a JSON-safe dict."""
     created = None
@@ -113,7 +145,7 @@ def _serialize(nb) -> dict:
     return {
         "id": nb.id,
         "title": nb.title or "Untitled notebook",
-        "emoji": None,
+        "emoji": _emojis.get(nb.id),
         "created_at": created,
         "updated_at": updated,
         "source_count": getattr(nb, "sources_count", 0),

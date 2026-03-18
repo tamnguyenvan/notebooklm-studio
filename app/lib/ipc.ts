@@ -159,6 +159,8 @@ export const ipc = {
     invoke<{ status: string }>('delete_notebook', { id }),
   pinNotebook:    (id: string, pinned: boolean) =>
     invoke<{ status: string; pinned: boolean }>('pin_notebook', { id, pinned }),
+  setNotebookEmoji: (id: string, emoji: string) =>
+    invoke<{ status: string; emoji: string }>('set_notebook_emoji', { id, emoji }),
 
   // ── Module 3: Sources ───────────────────────────────────────────────────
   listSources: (notebookId: string) =>
