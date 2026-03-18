@@ -15,6 +15,7 @@ import { ChatMessage, ChatReference, ipc } from '../../lib/ipc'
 import { useShortcut } from '../../lib/useShortcut'
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
+const modalTransition = { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] as const }
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 
@@ -526,8 +527,8 @@ function PersonaModal({ notebookId, onClose }: { notebookId: string; onClose: ()
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 16 }} transition={spring}
+      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }} transition={modalTransition}
         className="w-full max-w-md rounded-2xl overflow-hidden"
         style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)' }}>
         <div className="px-5 pt-5 pb-4">

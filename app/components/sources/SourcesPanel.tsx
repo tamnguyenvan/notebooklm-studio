@@ -11,7 +11,7 @@ import { ws } from '../../lib/ws'
 import { Source, SourceStatus } from '../../lib/ipc'
 import { AddSourceModal } from './AddSourceModal'
 
-const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
+const spring = { duration: 0.13, ease: [0.25, 0.1, 0.25, 1] as const }
 
 function statusColor(status: SourceStatus): string {
   switch (status) {
@@ -122,9 +122,9 @@ function SourceRow({ source, notebookId }: { source: Source; notebookId: string 
         <AP>
           {menuOpen && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -4 }}
+              initial={{ opacity: 0, scale: 0.96, y: 4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+              exit={{ opacity: 0, scale: 0.96, y: 4 }}
               transition={spring}
               className="absolute right-0 top-7 z-50 min-w-[140px] rounded-xl py-1 overflow-hidden"
               style={{

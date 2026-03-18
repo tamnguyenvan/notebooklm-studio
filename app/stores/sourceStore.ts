@@ -29,11 +29,16 @@ export const useSourceStore = create<SourceStore>((set, get) => ({
     set((s) => ({ loading: { ...s.loading, [notebookId]: true }, error: { ...s.error, [notebookId]: null } }))
     try {
       const sources = await ipc.listSources(notebookId)
-      set((s) => ({
-        sources: { ...s.sources, [notebookId]: sources },
-        loading: { ...s.loading, [notebookId]: false },
-        lastFetched: { ...s.lastFetched, [notebookId]: Date.now() },
-      }))
+      set((s) => {
+        // Merge: keep optimistic entries not yet returned by API, update existing ones
+        const incoming = new Map(sources.map((src) => [src.id, src]))
+        const optimistic = (s.sources[notebookId] ?? []).filter((src) => !incoming.has(src.id))
+        return {
+          sources: { ...s.sources, [notebookId]: [...sources, ...optimistic] },
+          loading: { ...s.loading, [notebookId]: false },
+          lastFetched: { ...s.lastFetched, [notebookId]: Date.now() },
+        }
+      })
     } catch (e) {
       set((s) => ({
         loading: { ...s.loading, [notebookId]: false },
@@ -43,12 +48,19 @@ export const useSourceStore = create<SourceStore>((set, get) => ({
   },
 
   addSource: (source) => {
-    set((s) => ({
-      sources: {
-        ...s.sources,
-        [source.notebook_id]: [source, ...(s.sources[source.notebook_id] ?? [])],
-      },
-    }))
+    set((s) => {
+      const existing = s.sources[source.notebook_id] ?? []
+      // Skip if already in store (by id or url)
+      if (existing.some((src) => src.id === source.id || (source.url && src.url === source.url))) {
+        return s
+      }
+      return {
+        sources: {
+          ...s.sources,
+          [source.notebook_id]: [source, ...existing],
+        },
+      }
+    })
   },
 
   updateSourceStatus: (notebookId, sourceId, status) => {

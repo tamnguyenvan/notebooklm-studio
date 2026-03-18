@@ -30,10 +30,10 @@ export function ToastContainer() {
           <motion.div
             key={toast.id}
             layout
-            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
             className="pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm"
             style={{
               background: 'var(--color-elevated)',

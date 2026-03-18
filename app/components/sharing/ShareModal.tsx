@@ -7,7 +7,8 @@ import { useSharingStore } from '../../stores/sharingStore'
 import { useToastStore } from '../../stores/toastStore'
 import { SharePermission } from '../../lib/ipc'
 
-const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
+const spring = { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] as const }
+const dropdownTransition = { duration: 0.13, ease: [0.25, 0.1, 0.25, 1] as const }
 
 // ── Custom permission dropdown ────────────────────────────────────────────────
 
@@ -65,10 +66,10 @@ function PermissionSelect({
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.97 }}
-            transition={{ duration: 0.12 }}
+            initial={{ opacity: 0, scale: 0.96, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 4 }}
+            transition={dropdownTransition}
             className="absolute top-full mt-1 right-0 rounded-xl overflow-hidden z-50"
             style={{
               background: 'var(--color-elevated)',
@@ -191,9 +192,9 @@ export function ShareModal({ notebookId, notebookTitle, onClose }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 16 }}
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
         transition={spring}
         className="w-full max-w-md rounded-2xl overflow-hidden"
         style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)' }}

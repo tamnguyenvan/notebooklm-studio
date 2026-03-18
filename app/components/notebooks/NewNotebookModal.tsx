@@ -64,10 +64,10 @@ export function NewNotebookModal({ open, onClose }: Props) {
           >
             {/* Modal — stop click propagation so clicking inside doesn't close */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               onClick={(e) => e.stopPropagation()}
               className="relative z-[9999] w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-2xl p-6"
               style={{

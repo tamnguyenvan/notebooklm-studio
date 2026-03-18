@@ -185,10 +185,10 @@ export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen }: Title
           <AP>
             {notiOpen && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                initial={{ opacity: 0, scale: 0.96, y: 4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                exit={{ opacity: 0, scale: 0.96, y: 4 }}
+                transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
                 className="absolute right-0 top-10 w-80 overflow-hidden rounded-xl shadow-xl"
                 style={{ background: 'var(--color-content-bg)', border: '1px solid var(--color-separator)', zIndex: 200 }}
               >

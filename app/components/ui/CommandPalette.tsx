@@ -16,7 +16,7 @@ import { useNotebookStore } from '../../stores/notebookStore'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { ArtifactType } from '../../lib/ipc'
 
-const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
+const spring = { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] as const }
 const RECENT_KEY = 'palette.recent'
 const MAX_RECENT = 5
 
@@ -296,9 +296,9 @@ export function CommandPalette({
         >
           <motion.div
             key="palette-panel"
-            initial={{ opacity: 0, scale: 0.96, y: -12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -12 }}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
             transition={spring}
             className="flex flex-col overflow-hidden"
             style={{

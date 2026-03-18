@@ -7,7 +7,7 @@ import { useSourceStore } from '../../stores/sourceStore'
 import { useToastStore } from '../../stores/toastStore'
 import { ipc } from '../../lib/ipc'
 
-const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
+const modalTransition = { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] as const }
 
 type Tab = 'url' | 'youtube' | 'file' | 'gdrive' | 'text'
 
@@ -106,10 +106,10 @@ export function AddSourceModal({ notebookId, onClose, initialTab }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 16 }}
-        transition={spring}
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        transition={modalTransition}
         className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
         style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)' }}
       >

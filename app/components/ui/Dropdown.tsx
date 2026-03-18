@@ -18,7 +18,7 @@ import { useRef, useState, useEffect, useId } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const spring = { type: 'spring' as const, stiffness: 500, damping: 35 }
+const spring = { duration: 0.13, ease: [0.25, 0.1, 0.25, 1] as const }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AP = AnimatePresence as any
 
@@ -39,9 +39,9 @@ function Popover({
     <AP>
       {open && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: -4 }}
+          initial={{ opacity: 0, scale: 0.96, y: 4 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: -4 }}
+          exit={{ opacity: 0, scale: 0.96, y: 4 }}
           transition={spring}
           className="absolute top-[calc(100%+6px)] z-[200] overflow-hidden rounded-xl py-1.5"
           style={{
