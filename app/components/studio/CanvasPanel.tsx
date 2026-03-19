@@ -1,8 +1,8 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, ChevronRight, Maximize2, Download } from 'lucide-react'
-import { useState, useCallback } from 'react'
+import { X, ChevronLeft, ChevronRight, Download } from 'lucide-react'
+import { useState, useCallback, useRef } from 'react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { ArtifactType } from '../../lib/ipc'
 import { AudioViewer } from './viewers/AudioViewer'
@@ -50,12 +50,28 @@ export function CanvasPanel() {
   const { show } = useToastStore()
   const { notebooks } = useNotebookStore()
   const { addDownload } = useDownloadStore()
-  const [expanded, setExpanded] = useState(false)
+  const [width, setWidth] = useState(520)
   const [showFormats, setShowFormats] = useState(false)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [lastItem, setLastItem] = useState<any>(canvasItem)
   if (canvasItem && canvasItem !== lastItem) setLastItem(canvasItem)
   const displayItem = canvasItem ?? lastItem
+
+  const onResizeDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = width
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(320, Math.min(900, startW + (startX - ev.clientX)))
+      setWidth(next)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [width])
 
   // Canvas shortcuts — only active when canvas is open
   const dispatchCanvasAction = useCallback((action: string) => {
@@ -129,13 +145,20 @@ export function CanvasPanel() {
             transition={{ type: 'spring', stiffness: 500, damping: 35 }}
             className="fixed top-0 right-0 bottom-0 flex flex-col z-40 border-l overflow-hidden"
             style={{
-              width: expanded ? 600 : 380,
+              width,
               background: 'var(--color-content-bg)',
               borderColor: 'var(--color-separator)',
               boxShadow: 'var(--shadow-xl)',
               top: 52,
             }}
           >
+          {/* Drag handle on left edge */}
+          <div
+            onMouseDown={onResizeDrag}
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize z-10 transition-colors"
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          />
           {/* Header */}
           {displayItem && (
             <div
@@ -147,16 +170,6 @@ export function CanvasPanel() {
                   ? 'Note'
                   : ARTIFACT_LABELS[(displayItem as { notebookId: string; artifactType: ArtifactType }).artifactType]}
               </span>
-              <button
-                onClick={() => setExpanded((e) => !e)}
-                className="p-1.5 rounded transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-app-bg)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                title={expanded ? 'Collapse' : 'Expand'}
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-              </button>
               <button
                 onClick={closeCanvas}
                 className="p-1.5 rounded transition-colors"
