@@ -9,7 +9,7 @@ import {
   Mic, Video, Presentation, HelpCircle, CreditCard,
   Image, FileText, Table, GitBranch,
   AlertCircle, Loader2, Download, X, MoreHorizontal,
-  Pencil, Trash2, Share2, Check,
+  Pencil, Trash2, Share2, Check, BookOpen,
 } from 'lucide-react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useToastStore } from '../../stores/toastStore'
@@ -74,6 +74,7 @@ export function StudioPanel({ notebookId }: Props) {
   const [taskStartTimes] = useState<Map<string, number>>(new Map())
   const [shareOpen, setShareOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<Artifact | null>(null)
+  const [noSourcesWarning, setNoSourcesWarning] = useState(false)
 
   // Vertical split
   const containerRef = useRef<HTMLDivElement>(null)
@@ -234,7 +235,10 @@ export function StudioPanel({ notebookId }: Props) {
               return (
                 <button
                   key={meta.type}
-                  onClick={() => setModalType(meta.type)}
+                  onClick={() => {
+                    if (notebookSources.length === 0) { setNoSourcesWarning(true); return }
+                    setModalType(meta.type)
+                  }}
                   className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition-colors relative overflow-hidden"
                   style={{
                     background: 'var(--color-elevated)',
@@ -286,11 +290,16 @@ export function StudioPanel({ notebookId }: Props) {
 
         <div className="flex-1 overflow-y-auto px-3 pb-3 min-h-0">
           {listedArtifacts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2 py-8">
-              <span className="text-2xl opacity-30">✨</span>
-              <p className="text-xs text-center" style={{ color: 'var(--color-text-tertiary)' }}>
-                Generated artifacts will appear here
-              </p>
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-8 px-4">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-separator)' }}>
+                <span className="text-lg">✨</span>
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-text-primary)' }}>Nothing generated yet</p>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-tertiary)' }}>
+                  Pick a format above to generate your first artifact from this notebook.
+                </p>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
@@ -346,7 +355,61 @@ export function StudioPanel({ notebookId }: Props) {
           }}
         />
       )}
+
+      {noSourcesWarning && (
+        <NoSourcesModal onClose={() => setNoSourcesWarning(false)} />
+      )}
     </div>
+  )
+}
+
+// ── No sources warning modal ──────────────────────────────────────────────────
+
+function NoSourcesModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.15 }}
+        className="w-full max-w-xs rounded-2xl p-5 flex flex-col gap-4"
+        style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)', border: '1px solid var(--color-separator)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(255,159,10,0.12)' }}>
+            <BookOpen size={16} style={{ color: '#FF9F0A' }} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--color-text-primary)' }}>No sources added</p>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+              Add at least one source to this notebook before generating. Sources give the AI the context it needs to create accurate content.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full rounded-xl py-2 text-sm font-semibold text-white"
+          style={{ background: 'var(--color-accent)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-hover)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
+        >
+          Got it
+        </button>
+      </motion.div>
+    </div>,
+    document.body
   )
 }
 
