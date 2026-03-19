@@ -60,13 +60,20 @@ export const useArtifactStore = create<ArtifactStore>((set) => ({
         const current = s.artifacts[notebookId] ?? []
         // Never downgrade a 'ready' artifact back to 'generating'
         const merged = artifacts.map((fresh) => {
-          const existing = current.find((c) => c.type === fresh.type)
+          const existing = current.find((c) => c.id === fresh.id)
           if (existing?.status === 'ready' && fresh.status === 'generating') return existing
           return fresh
         })
-        // Keep any locally-known types not yet returned by the API
-        const freshTypes = new Set(merged.map((a) => a.type))
-        const localOnly = current.filter((a) => !freshTypes.has(a.type))
+
+        // On force refresh, trust the API fully — only keep local entries that
+        // are still actively generating and not yet known to the backend
+        const freshIds = new Set(merged.map((a) => a.id))
+        const localOnly = force
+          ? current.filter((a) => a.status === 'generating' && !freshIds.has(a.id))
+          : current.filter((a) => {
+              const freshByType = merged.find((m) => m.type === a.type)
+              return !freshByType
+            })
         const allArtifacts = [...merged, ...localOnly]
 
         // Reconcile: if the API says an artifact is still 'generating' but we have
