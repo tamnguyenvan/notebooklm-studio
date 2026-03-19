@@ -9,7 +9,6 @@ import { useNotebookStore } from '../../stores/notebookStore'
 import { SourcesPanel } from '../sources/SourcesPanel'
 import { ChatPanel } from '../chat/ChatPanel'
 import { CanvasPanel } from '../studio/CanvasPanel'
-import { BackgroundTaskBar } from '../studio/BackgroundTaskBar'
 import { ResearchPanel } from '../research/ResearchPanel'
 import { NotesPanel } from '../notes/NotesPanel'
 import { ShareModal } from '../sharing/ShareModal'
@@ -179,7 +178,6 @@ export function NotebookScreen({ notebookId }: Props) {
               </div>
             ))}
           </div>
-          <BackgroundTaskBar notebookId={notebookId} />
         </div>
         <CanvasPanel />
       </div>
