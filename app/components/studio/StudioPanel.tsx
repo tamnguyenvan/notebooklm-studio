@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AP = AnimatePresence as any
 import {
   Mic, Video, Presentation, HelpCircle, CreditCard,
   Image, FileText, Table, GitBranch,
-  RefreshCw, AlertCircle, Loader2, Download, X, Play,
+  AlertCircle, Loader2, Download, X, Play, MoreHorizontal,
+  Pencil, Trash2, Share2, Check,
 } from 'lucide-react'
 import { useArtifactStore } from '../../stores/artifactStore'
 import { useToastStore } from '../../stores/toastStore'
@@ -18,6 +20,7 @@ import { ws } from '../../lib/ws'
 import { ArtifactType, Artifact, GenerateConfig } from '../../lib/ipc'
 import { ipc } from '../../lib/ipc'
 import { GenerateModal } from './GenerateModal'
+import { ShareModal } from '../sharing/ShareModal'
 
 const GENERATING_TIMEOUT_MS = 20 * 60 * 1000
 
@@ -55,13 +58,13 @@ const DOWNLOAD_FORMATS: Record<ArtifactType, { label: string; ext: string; forma
   mind_map:    { label: 'JSON',     ext: 'json', format: 'json' },
 }
 
-// Divider height between top/bottom sections
 const DIVIDER_MIN = 120
-const DIVIDER_MAX_RATIO = 0.75 // max 75% of panel height
+const DIVIDER_MAX_RATIO = 0.75
 
 export function StudioPanel({ notebookId }: Props) {
   const { artifacts, loading, activeTasks, fetchArtifacts, generate, cancelTask,
-    onTaskProgress, onTaskComplete, onTaskError, openCanvas } = useArtifactStore()
+    onTaskProgress, onTaskComplete, onTaskError, openCanvas,
+    renameArtifact, deleteArtifact } = useArtifactStore()
   const { show } = useToastStore()
   const { notebooks } = useNotebookStore()
   const { addDownload } = useDownloadStore()
@@ -69,8 +72,10 @@ export function StudioPanel({ notebookId }: Props) {
   const notebookSources = (allSources[notebookId] ?? []).filter((s) => s.status === 'ready')
   const [modalType, setModalType] = useState<ArtifactType | null>(null)
   const [taskStartTimes] = useState<Map<string, number>>(new Map())
+  const [shareOpen, setShareOpen] = useState(false)
+  const [renameTarget, setRenameTarget] = useState<Artifact | null>(null)
 
-  // Vertical split between generate buttons and artifact list
+  // Vertical split
   const containerRef = useRef<HTMLDivElement>(null)
   const [topHeight, setTopHeight] = useState(260)
 
@@ -150,8 +155,8 @@ export function StudioPanel({ notebookId }: Props) {
     }
   }
 
-  const handleCancel = async (type: ArtifactType) => {
-    const task = activeTasks.find((t) => t.notebookId === notebookId && t.artifactType === type)
+  const handleCancel = async (taskId: string, type: ArtifactType) => {
+    const task = activeTasks.find((t) => t.taskId === taskId)
     if (!task) return
     try {
       await cancelTask(task.taskId)
@@ -161,17 +166,17 @@ export function StudioPanel({ notebookId }: Props) {
     }
   }
 
-  const handleDownload = async (type: ArtifactType) => {
-    const fmt = DOWNLOAD_FORMATS[type]
-    const label = ARTIFACT_TYPES.find((a) => a.type === type)?.label ?? type
+  const handleDownload = async (artifact: Artifact) => {
+    const fmt = DOWNLOAD_FORMATS[artifact.type]
+    const label = artifact.title || ARTIFACT_TYPES.find((a) => a.type === artifact.type)?.label || artifact.type
     const filename = `${label.replace(/\s+/g, '_')}.${fmt.ext}`
     try {
       const destPath = await ipc.openSaveDialog(filename, [{ name: fmt.label, extensions: [fmt.ext] }])
       if (!destPath) return
-      await ipc.downloadArtifact(notebookId, type, destPath, fmt.format)
+      await ipc.downloadArtifact(notebookId, artifact.type, destPath, fmt.format)
       const notebookTitle = notebooks.find((n) => n.id === notebookId)?.title ?? ''
       try {
-        const record = await ipc.recordDownload(notebookId, notebookTitle, type, fmt.format, destPath)
+        const record = await ipc.recordDownload(notebookId, notebookTitle, artifact.type, fmt.format, destPath)
         addDownload(record)
         show({ type: 'success', message: `Saved ${filename}`, undoLabel: 'Show in Finder', onUndo: () => ipc.revealDownload(record.id).catch(() => {}), duration: 6000 })
       } catch {
@@ -182,23 +187,37 @@ export function StudioPanel({ notebookId }: Props) {
     }
   }
 
-  const getArtifact = (type: ArtifactType): Artifact | undefined =>
-    notebookArtifacts.find((a) => a.type === type)
+  const handleRename = (artifact: Artifact) => {
+    setRenameTarget(artifact)
+  }
 
-  // Ready artifacts for the bottom list
-  const readyArtifacts = ARTIFACT_TYPES.filter((m) => {
-    const a = getArtifact(m.type)
-    return a && (a.status === 'ready' || a.status === 'generating' || a.status === 'error')
-  })
+  const handleDelete = (artifact: Artifact) => {
+    deleteArtifact(notebookId, artifact.id)
+  }
+
+  // Artifacts to show in the bottom list (all non-none statuses)
+  const listedArtifacts = notebookArtifacts.filter(
+    (a) => a.status === 'ready' || a.status === 'generating' || a.status === 'error'
+  )
+
+  // For the top grid: show generating state if any task of that type is active
+  const getTypeStatus = (type: ArtifactType) => {
+    const task = activeTasks.find((t) => t.notebookId === notebookId && t.artifactType === type)
+    if (task) return { status: 'generating' as const, progress: task.progress }
+    const ready = notebookArtifacts.find((a) => a.type === type && a.status === 'ready')
+    if (ready) return { status: 'ready' as const, progress: 100 }
+    const err = notebookArtifacts.find((a) => a.type === type && a.status === 'error')
+    if (err) return { status: 'error' as const, progress: 0 }
+    return { status: 'none' as const, progress: 0 }
+  }
+
+  const notebook = notebooks.find((n) => n.id === notebookId)
 
   return (
     <div ref={containerRef} className="flex flex-col h-full overflow-hidden">
 
       {/* ── Top: Generate buttons ── */}
-      <div
-        className="flex flex-col overflow-hidden shrink-0"
-        style={{ height: topHeight }}
-      >
+      <div className="flex flex-col overflow-hidden shrink-0" style={{ height: topHeight }}>
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary)' }}>
             Generate
@@ -209,49 +228,33 @@ export function StudioPanel({ notebookId }: Props) {
         <div className="flex-1 overflow-y-auto px-3 pb-3">
           <div className="grid grid-cols-3 gap-1.5">
             {ARTIFACT_TYPES.map((meta) => {
-              const artifact = getArtifact(meta.type)
-              const status = artifact?.status ?? 'none'
-              const progress = artifact?.progress ?? 0
+              const { status, progress } = getTypeStatus(meta.type)
               const isGenerating = status === 'generating'
 
               return (
                 <button
                   key={meta.type}
-                  onClick={() => isGenerating ? handleCancel(meta.type) : setModalType(meta.type)}
+                  onClick={() => setModalType(meta.type)}
                   className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition-colors relative overflow-hidden"
                   style={{
-                    background: isGenerating
-                      ? 'var(--color-accent-subtle)'
-                      : status === 'ready'
-                      ? 'var(--color-elevated)'
-                      : status === 'error'
-                      ? 'rgba(255,69,58,0.06)'
-                      : 'var(--color-elevated)',
-                    border: `1px solid ${
-                      isGenerating ? 'rgba(0,122,255,0.3)'
-                      : status === 'error' ? 'var(--color-error)'
-                      : 'var(--color-separator)'
-                    }`,
+                    background: 'var(--color-elevated)',
+                    border: `1px solid ${status === 'error' ? 'var(--color-error)' : 'var(--color-separator)'}`,
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = isGenerating ? 'var(--color-accent-subtle)' : 'var(--color-app-bg)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = isGenerating ? 'var(--color-accent-subtle)' : status === 'ready' ? 'var(--color-elevated)' : status === 'error' ? 'rgba(255,69,58,0.06)' : 'var(--color-elevated)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-app-bg)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-elevated)' }}
                 >
-                  {/* Progress bar at bottom */}
                   {isGenerating && (
                     <div className="absolute bottom-0 left-0 h-0.5 rounded-full" style={{ width: `${progress}%`, background: 'var(--color-accent)', transition: 'width 400ms ease' }} />
                   )}
-
                   <span style={{
-                    color: isGenerating ? 'var(--color-accent)'
-                      : status === 'ready' ? '#34C759'
+                    color: status === 'ready' ? '#34C759'
                       : status === 'error' ? 'var(--color-error)'
                       : 'var(--color-text-secondary)',
                   }}>
-                    {isGenerating ? <Loader2 size={14} className="animate-spin" /> : meta.icon}
+                    {meta.icon}
                   </span>
                   <span className="text-[11px] font-medium leading-tight" style={{
-                    color: isGenerating ? 'var(--color-accent)'
-                      : status === 'ready' ? 'var(--color-text-primary)'
+                    color: status === 'ready' ? 'var(--color-text-primary)'
                       : status === 'error' ? 'var(--color-error)'
                       : 'var(--color-text-secondary)',
                   }}>
@@ -282,7 +285,7 @@ export function StudioPanel({ notebookId }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 pb-3 min-h-0">
-          {readyArtifacts.length === 0 ? (
+          {listedArtifacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2 py-8">
               <span className="text-2xl opacity-30">✨</span>
               <p className="text-xs text-center" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -291,17 +294,20 @@ export function StudioPanel({ notebookId }: Props) {
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              {readyArtifacts.map((meta) => {
-                const artifact = getArtifact(meta.type)!
+              {listedArtifacts.map((artifact) => {
+                const meta = ARTIFACT_TYPES.find((m) => m.type === artifact.type)!
                 return (
                   <ArtifactRow
-                    key={meta.type}
+                    key={artifact.id}
                     meta={meta}
                     artifact={artifact}
-                    onOpen={() => openCanvas(notebookId, meta.type)}
-                    onRegenerate={() => setModalType(meta.type)}
-                    onDownload={() => handleDownload(meta.type)}
-                    onCancel={() => handleCancel(meta.type)}
+                    onOpen={() => openCanvas(notebookId, artifact.type)}
+                    onDownload={() => handleDownload(artifact)}
+                    onCancel={() => artifact.task_id && handleCancel(artifact.task_id, artifact.type)}
+                    onRename={() => handleRename(artifact)}
+                    onDelete={() => handleDelete(artifact)}
+                    onShare={() => setShareOpen(true)}
+                    onRetry={() => setModalType(artifact.type)}
                   />
                 )
               })}
@@ -320,21 +326,59 @@ export function StudioPanel({ notebookId }: Props) {
           />
         )}
       </AP>
+
+      {shareOpen && notebook && (
+        <ShareModal
+          notebookId={notebookId}
+          notebookTitle={notebook.title}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
+
+      {renameTarget && (
+        <RenameModal
+          artifact={renameTarget}
+          defaultLabel={ARTIFACT_TYPES.find((m) => m.type === renameTarget.type)?.label ?? renameTarget.type}
+          onClose={() => setRenameTarget(null)}
+          onConfirm={(title) => {
+            renameArtifact(notebookId, renameTarget.id, title)
+            setRenameTarget(null)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-// ── Artifact row (bottom list) ────────────────────────────────────────────────
+// ── Artifact row ──────────────────────────────────────────────────────────────
 
-function ArtifactRow({ meta, artifact, onOpen, onRegenerate, onDownload, onCancel }: {
+function ArtifactRow({ meta, artifact, onOpen, onDownload, onCancel, onRename, onDelete, onShare, onRetry }: {
   meta: ArtifactMeta
   artifact: Artifact
   onOpen: () => void
-  onRegenerate: () => void
   onDownload: () => void
   onCancel: () => void
+  onRename: () => void
+  onDelete: () => void
+  onShare: () => void
+  onRetry: () => void
 }) {
   const { status, progress = 0 } = artifact
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const displayTitle = artifact.title && artifact.title !== artifact.type
+    ? artifact.title
+    : meta.label
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
 
   return (
     <div
@@ -356,7 +400,7 @@ function ArtifactRow({ meta, artifact, onOpen, onRegenerate, onDownload, onCance
 
       {/* Label + progress */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{meta.label}</p>
+        <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{displayTitle}</p>
         {status === 'generating' && (
           <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-separator)' }}>
             <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'var(--color-accent)', transition: 'width 400ms ease' }} />
@@ -373,19 +417,102 @@ function ArtifactRow({ meta, artifact, onOpen, onRegenerate, onDownload, onCance
           <>
             <IconBtn icon={<Play size={11} />} title="Open" onClick={onOpen} />
             <IconBtn icon={<Download size={11} />} title="Download" onClick={onDownload} />
-            <IconBtn icon={<RefreshCw size={11} />} title="Regenerate" onClick={onRegenerate} />
+            <div ref={menuRef} className="relative">
+              <IconBtn
+                icon={<MoreHorizontal size={11} />}
+                title="More options"
+                onClick={() => setMenuOpen((v) => !v)}
+              />
+              <AP>
+                {menuOpen && (
+                  <ContextMenu
+                    onRename={() => { setMenuOpen(false); onRename() }}
+                    onDownload={() => { setMenuOpen(false); onDownload() }}
+                    onShare={() => { setMenuOpen(false); onShare() }}
+                    onDelete={() => { setMenuOpen(false); onDelete() }}
+                  />
+                )}
+              </AP>
+            </div>
           </>
         )}
         {status === 'generating' && (
           <IconBtn icon={<X size={11} />} title="Cancel" onClick={onCancel} danger />
         )}
         {status === 'error' && (
-          <IconBtn icon={<AlertCircle size={11} />} title="Retry" onClick={onRegenerate} danger />
+          <>
+            <IconBtn icon={<AlertCircle size={11} />} title="Retry" onClick={onRetry} danger />
+            <div ref={menuRef} className="relative">
+              <IconBtn
+                icon={<MoreHorizontal size={11} />}
+                title="More options"
+                onClick={() => setMenuOpen((v) => !v)}
+              />
+              <AP>
+                {menuOpen && (
+                  <ContextMenu
+                    onRename={() => { setMenuOpen(false); onRename() }}
+                    onDownload={() => { setMenuOpen(false); onDownload() }}
+                    onShare={() => { setMenuOpen(false); onShare() }}
+                    onDelete={() => { setMenuOpen(false); onDelete() }}
+                  />
+                )}
+              </AP>
+            </div>
+          </>
         )}
       </div>
     </div>
   )
 }
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+
+function ContextMenu({ onRename, onDownload, onShare, onDelete }: {
+  onRename: () => void
+  onDownload: () => void
+  onShare: () => void
+  onDelete: () => void
+}) {
+  const items = [
+    { icon: <Pencil size={11} />, label: 'Rename', action: onRename },
+    { icon: <Download size={11} />, label: 'Download', action: onDownload },
+    { icon: <Share2 size={11} />, label: 'Share', action: onShare },
+    { icon: <Trash2 size={11} />, label: 'Delete', action: onDelete, danger: true },
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: -4 }}
+      transition={{ duration: 0.1 }}
+      className="absolute right-0 top-full mt-1 rounded-xl border overflow-hidden z-50"
+      style={{
+        background: 'var(--color-elevated)',
+        borderColor: 'var(--color-separator)',
+        boxShadow: 'var(--shadow-lg)',
+        minWidth: 140,
+      }}
+    >
+      {items.map(({ icon, label, action, danger }) => (
+        <button
+          key={label}
+          onClick={action}
+          className="flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors"
+          style={{ color: danger ? 'var(--color-error)' : 'var(--color-text-primary)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-app-bg)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
+    </motion.div>
+  )
+}
+
+// ── Icon button ───────────────────────────────────────────────────────────────
 
 function IconBtn({ icon, title, onClick, danger }: { icon: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
   return (
