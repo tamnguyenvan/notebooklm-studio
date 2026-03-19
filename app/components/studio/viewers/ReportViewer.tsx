@@ -65,7 +65,23 @@ export function ReportViewer({ notebookId }: Props) {
   const [error, setError]     = useState<string | null>(null)
   const [toc, setToc]         = useState<TocItem[]>([])
   const [activeId, setActiveId] = useState<string>('')
+  const [tocWidth, setTocWidth] = useState(144)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const onTocResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = tocWidth
+    const onMove = (ev: MouseEvent) => {
+      setTocWidth(Math.max(80, Math.min(280, startW + ev.clientX - startX)))
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [tocWidth])
 
   useEffect(() => {
     setLoading(true)
@@ -144,8 +160,8 @@ export function ReportViewer({ notebookId }: Props) {
 
       {/* TOC sidebar */}
       {toc.length > 0 && (
-        <div className="w-36 shrink-0 overflow-y-auto p-3 border-r flex flex-col"
-          style={{ borderColor: 'var(--color-separator)' }}>
+        <div className="shrink-0 overflow-y-auto p-3 border-r flex flex-col relative"
+          style={{ width: tocWidth, borderColor: 'var(--color-separator)' }}>
           <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
             style={{ color: 'var(--color-text-tertiary)' }}>Contents</p>
           <div className="flex-1 overflow-y-auto">
@@ -153,6 +169,7 @@ export function ReportViewer({ notebookId }: Props) {
               <button
                 key={item.id}
                 onClick={() => scrollTo(item.id)}
+                title={item.text}
                 className="block w-full text-left text-xs py-1 truncate transition-colors rounded px-1"
                 style={{
                   paddingLeft: `${4 + (item.level - 1) * 8}px`,
@@ -171,6 +188,13 @@ export function ReportViewer({ notebookId }: Props) {
           <div className="pt-2 mt-2 border-t" style={{ borderColor: 'var(--color-separator)' }}>
             <CopyButton text={content ?? ''} />
           </div>
+          {/* Drag handle */}
+          <div
+            onMouseDown={onTocResize}
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize transition-colors"
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          />
         </div>
       )}
 
