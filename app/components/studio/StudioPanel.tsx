@@ -8,7 +8,7 @@ const AP = AnimatePresence as any
 import {
   Mic, Video, Presentation, HelpCircle, CreditCard,
   Image, FileText, Table, GitBranch,
-  AlertCircle, Loader2, Download, X, Play, MoreHorizontal,
+  AlertCircle, Loader2, Download, X, MoreHorizontal,
   Pencil, Trash2, Share2, Check,
 } from 'lucide-react'
 import { useArtifactStore } from '../../stores/artifactStore'
@@ -383,10 +383,14 @@ function ArtifactRow({ meta, artifact, onOpen, onDownload, onCancel, onRename, o
   return (
     <div
       className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
+      onClick={status === 'ready' ? onOpen : undefined}
       style={{
         background: 'var(--color-elevated)',
         border: `1px solid ${status === 'generating' ? 'rgba(0,122,255,0.25)' : status === 'error' ? 'var(--color-error)' : 'var(--color-separator)'}`,
+        cursor: status === 'ready' ? 'pointer' : 'default',
       }}
+      onMouseEnter={(e) => { if (status === 'ready') e.currentTarget.style.background = 'var(--color-app-bg)' }}
+      onMouseLeave={(e) => { if (status === 'ready') e.currentTarget.style.background = 'var(--color-elevated)' }}
     >
       {/* Icon */}
       <span className="shrink-0" style={{
@@ -400,7 +404,7 @@ function ArtifactRow({ meta, artifact, onOpen, onDownload, onCancel, onRename, o
 
       {/* Label + progress */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{displayTitle}</p>
+        <p className="text-xs font-medium truncate" title={displayTitle} style={{ color: 'var(--color-text-primary)' }}>{displayTitle}</p>
         {status === 'generating' && (
           <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-separator)' }}>
             <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'var(--color-accent)', transition: 'width 400ms ease' }} />
@@ -412,10 +416,9 @@ function ArtifactRow({ meta, artifact, onOpen, onDownload, onCancel, onRename, o
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
         {status === 'ready' && (
           <>
-            <IconBtn icon={<Play size={11} />} title="Open" onClick={onOpen} />
             <IconBtn icon={<Download size={11} />} title="Download" onClick={onDownload} />
             <div ref={menuRef} className="relative">
               <IconBtn
