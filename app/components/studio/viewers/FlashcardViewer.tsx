@@ -246,9 +246,14 @@ export function FlashcardViewer({ notebookId }: Props) {
 
 function parseCards(data: unknown): Flashcard[] {
   if (!data) return []
+  // Handle { content: "..." } — sidecar fallback when JSON parse failed
+  if (typeof (data as Record<string, unknown>).content === 'string') {
+    try { return parseCards(JSON.parse((data as Record<string, unknown>).content as string)) } catch { return [] }
+  }
   const arr = Array.isArray(data) ? data
     : (data as Record<string, unknown>).cards
     ?? (data as Record<string, unknown>).flashcards
+    ?? (data as Record<string, unknown>).items
     ?? []
   if (!Array.isArray(arr)) return []
   return arr.map((c: unknown) => {

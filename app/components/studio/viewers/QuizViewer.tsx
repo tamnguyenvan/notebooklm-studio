@@ -94,7 +94,12 @@ export function QuizViewer({ notebookId }: Props) {
     </div>
   )
 
-  if (!q) return null
+  if (!q) return (
+    <div className="flex flex-col h-full items-center justify-center gap-2 p-6">
+      <span className="text-3xl opacity-30">📝</span>
+      <p className="text-sm text-center" style={{ color: 'var(--color-text-tertiary)' }}>No questions found</p>
+    </div>
+  )
 
   const options = q.options ?? []
 
@@ -221,22 +226,36 @@ function parseQuizData(data: unknown): QuizQuestion[] {
   if (!data) return []
   // Handle array of questions directly
   if (Array.isArray(data)) return data.map(normalizeQuestion).filter(Boolean) as QuizQuestion[]
-  // Handle { questions: [...] }
   const d = data as Record<string, unknown>
+  // Handle { questions: [...] }
   if (Array.isArray(d.questions)) return d.questions.map(normalizeQuestion).filter(Boolean) as QuizQuestion[]
+  // Handle { content: "..." } — sidecar fallback when JSON parse failed; try re-parsing
+  if (typeof d.content === 'string') {
+    try {
+      const inner = JSON.parse(d.content)
+      return parseQuizData(inner)
+    } catch { return [] }
+  }
   return []
+}
+
+// Strip "A. ", "A) ", "1. ", "1) " prefixes from option strings
+function stripOptionPrefix(s: string): string {
+  return s.replace(/^[A-Za-z0-9][.)]\s+/, '').trim()
 }
 
 function normalizeQuestion(q: unknown): QuizQuestion | null {
   if (!q || typeof q !== 'object') return null
   const obj = q as Record<string, unknown>
-  const question = String(obj.question ?? obj.q ?? '')
-  const options: string[] = Array.isArray(obj.options)
-    ? obj.options.map(String)
+  const question = String(obj.question ?? obj.q ?? obj.text ?? '')
+  const rawOptions: string[] = Array.isArray(obj.options)
+    ? (obj.options as unknown[]).map(String)
     : Array.isArray(obj.choices)
     ? (obj.choices as unknown[]).map(String)
     : []
-  const answer = obj.answer ?? obj.correct_answer ?? obj.correct ?? 0
+  // Strip letter/number prefixes (e.g. "A. Option text" → "Option text")
+  const options = rawOptions.map(stripOptionPrefix)
+  const answer = obj.answer ?? obj.correct_answer ?? obj.correct_option ?? obj.correct ?? 0
   const explanation = obj.explanation ? String(obj.explanation) : undefined
   if (!question || options.length === 0) return null
   return { question, options, answer: answer as string | number, explanation }

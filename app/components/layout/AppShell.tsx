@@ -31,7 +31,7 @@ export function AppShell() {
   const handleKeyDown = useShortcutStore((s) => s.handleKeyDown)
   const { view, loadPrefs, setView } = useUIStore()
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [studioOpen, setStudioOpen] = useState(false)
+  const [studioOpen, setStudioOpen] = useState(true)
   const [studioWidth, setStudioWidth] = useState(STUDIO_DEFAULT)
   const [newNotebookOpen, setNewNotebookOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)

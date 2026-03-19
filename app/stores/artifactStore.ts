@@ -24,6 +24,8 @@ interface ArtifactStore {
   fetchArtifacts: (notebookId: string, force?: boolean) => Promise<void>
   generate: (notebookId: string, config: GenerateConfig) => Promise<string>
   cancelTask: (taskId: string) => Promise<void>
+  renameArtifact: (notebookId: string, artifactId: string, title: string) => void
+  deleteArtifact: (notebookId: string, artifactId: string) => void
   // WS event handlers
   onTaskProgress: (taskId: string, notebookId: string, progress: number, message: string) => void
   onTaskComplete: (taskId: string, notebookId: string, artifactType: ArtifactType) => void
@@ -105,32 +107,43 @@ export const useArtifactStore = create<ArtifactStore>((set) => ({
       progress: 0,
       message: 'Starting…',
     }
-    // Mark artifact as generating
+    // Always add a new artifact entry (allows multiple per type)
     set((s) => {
       const existing = s.artifacts[notebookId] ?? []
-      const updated = existing.some((a) => a.type === config.type)
-        ? existing.map((a) =>
-            a.type === config.type
-              ? { ...a, status: 'generating' as const, task_id, progress: 0 }
-              : a
-          )
-        : [
-            ...existing,
-            {
-              id: task_id,
-              title: config.type,
-              type: config.type as ArtifactType,
-              status: 'generating' as const,
-              task_id,
-              progress: 0,
-            },
-          ]
+      const newArtifact: Artifact = {
+        id: task_id,
+        title: config.type,
+        type: config.type as ArtifactType,
+        status: 'generating' as const,
+        task_id,
+        progress: 0,
+      }
       return {
         activeTasks: [...s.activeTasks, task],
-        artifacts: { ...s.artifacts, [notebookId]: updated },
+        artifacts: { ...s.artifacts, [notebookId]: [...existing, newArtifact] },
       }
     })
     return task_id
+  },
+
+  renameArtifact: (notebookId, artifactId, title) => {
+    set((s) => ({
+      artifacts: {
+        ...s.artifacts,
+        [notebookId]: (s.artifacts[notebookId] ?? []).map((a) =>
+          a.id === artifactId ? { ...a, title } : a
+        ),
+      },
+    }))
+  },
+
+  deleteArtifact: (notebookId, artifactId) => {
+    set((s) => ({
+      artifacts: {
+        ...s.artifacts,
+        [notebookId]: (s.artifacts[notebookId] ?? []).filter((a) => a.id !== artifactId),
+      },
+    }))
   },
 
   cancelTask: async (taskId) => {
@@ -158,32 +171,33 @@ export const useArtifactStore = create<ArtifactStore>((set) => ({
   },
 
   onTaskComplete: (taskId, notebookId, artifactType) => {
-    // Mark as ready immediately so the UI updates without waiting for fetch
+    // Mark the specific artifact (by task_id) as ready
     set((s) => ({
       activeTasks: s.activeTasks.filter((t) => t.taskId !== taskId),
       artifacts: {
         ...s.artifacts,
         [notebookId]: (s.artifacts[notebookId] ?? []).map((a) =>
-          a.task_id === taskId || a.type === artifactType
+          a.task_id === taskId
             ? { ...a, status: 'ready' as const, progress: 100 }
             : a
         ),
       },
     }))
-    // Refresh to get real artifact data, but merge carefully to not clobber ready state
+    // Refresh to get real artifact data from backend
     ipc.listArtifacts(notebookId).then((fresh) => {
       set((s) => {
         const current = s.artifacts[notebookId] ?? []
-        // Merge: fresh list wins for ready artifacts, but keep any 'generating' ones
-        // that aren't in the fresh list yet (still in-flight)
-        const freshTypes = new Set(fresh.map((a) => a.type))
-        const stillGenerating = current.filter(
-          (a) => a.status === 'generating' && !freshTypes.has(a.type)
+        // Keep locally-added artifacts (multiple per type) that aren't in the fresh list
+        const freshTaskIds = new Set(fresh.map((a) => a.task_id).filter(Boolean))
+        const localExtras = current.filter(
+          (a) => a.status !== 'generating' && a.task_id && !freshTaskIds.has(a.task_id)
         )
+        // Keep still-generating ones
+        const stillGenerating = current.filter((a) => a.status === 'generating')
         return {
           artifacts: {
             ...s.artifacts,
-            [notebookId]: [...fresh, ...stillGenerating],
+            [notebookId]: [...fresh, ...localExtras, ...stillGenerating],
           },
         }
       })
