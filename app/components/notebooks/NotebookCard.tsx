@@ -7,9 +7,7 @@ import { useNotebookStore } from '../../stores/notebookStore'
 import { useSourceStore } from '../../stores/sourceStore'
 import { useToastStore } from '../../stores/toastStore'
 import { ShareModal } from '../sharing/ShareModal'
-
-const EMOJIS = ['📓','📔','📒','📕','📗','📘','📙','🗒️','📋','📄','📑','🗂️',
-  '💡','🔬','🧪','🎯','🚀','🌍','🎨','🎵','💻','🤖','🧠','⚡']
+import { EmojiPickerModal } from '../ui/EmojiPickerModal'
 
 function timeAgo(iso: string | null): string {
   if (!iso) return ''
@@ -233,7 +231,6 @@ export function NotebookCard({ notebook, onClick }: Props) {
     )}
     {emojiPickerOpen && (
       <EmojiPickerModal
-        current={notebook.emoji ?? '📓'}
         onSelect={(e) => { setNotebookEmoji(notebook.id, e); setEmojiPickerOpen(false) }}
         onClose={() => setEmojiPickerOpen(false)}
       />
@@ -264,48 +261,3 @@ function MenuItem({
   )
 }
 
-function EmojiPickerModal({ current, onSelect, onClose }: {
-  current: string
-  onSelect: (emoji: string) => void
-  onClose: () => void
-}) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  return (
-    <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.4)' }}
-      onClick={onClose}
-    >
-      <div
-        className="rounded-2xl p-4 w-64"
-        style={{ background: 'var(--color-elevated)', boxShadow: 'var(--shadow-xl)', border: '1px solid var(--color-separator)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-tertiary)' }}>
-          Choose icon
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {EMOJIS.map((e) => (
-            <button
-              key={e}
-              onClick={() => onSelect(e)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all"
-              style={{
-                background: e === current ? 'var(--color-accent-subtle)' : 'transparent',
-                outline: e === current ? '2px solid var(--color-accent)' : 'none',
-                outlineOffset: '-1px',
-              }}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}

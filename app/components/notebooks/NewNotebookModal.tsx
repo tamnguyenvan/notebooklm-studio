@@ -7,9 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 const AP = AnimatePresence as any
 import { X } from 'lucide-react'
 import { useNotebookStore } from '../../stores/notebookStore'
-
-const EMOJIS = ['📓','📔','📒','📕','📗','📘','📙','🗒️','📋','📄','📑','🗂️',
-  '💡','🔬','🧪','🎯','🚀','🌍','🎨','🎵','💻','🤖','🧠','⚡']
+import { EmojiPickerModal } from '../ui/EmojiPickerModal'
 
 interface Props {
   open: boolean
@@ -19,6 +17,7 @@ interface Props {
 export function NewNotebookModal({ open, onClose }: Props) {
   const [title, setTitle] = useState('')
   const [emoji, setEmoji] = useState('📓')
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const { createNotebook, setActiveNotebook } = useNotebookStore()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -95,21 +94,18 @@ export function NewNotebookModal({ open, onClose }: Props) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-tertiary)' }}>
               Icon
             </p>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => setEmoji(e)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all"
-                  style={{
-                    background: emoji === e ? 'var(--color-accent-subtle)' : 'transparent',
-                    outline: emoji === e ? '2px solid var(--color-accent)' : 'none',
-                    outlineOffset: '-1px',
-                  }}
-                >
-                  {e}
-                </button>
-              ))}
+            <div className="mb-4 flex items-center gap-3">
+              <button
+                onClick={() => setEmojiPickerOpen(true)}
+                className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl transition-colors"
+                style={{ background: 'var(--color-app-bg)', border: '1px solid var(--color-separator)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-separator)')}
+                title="Choose emoji"
+              >
+                {emoji}
+              </button>
+              <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Click to change</span>
             </div>
 
             {/* Title input */}
@@ -164,5 +160,15 @@ export function NewNotebookModal({ open, onClose }: Props) {
   )
 
   if (typeof document === 'undefined') return null
-  return createPortal(content, document.body)
+  return (
+    <>
+      {createPortal(content, document.body)}
+      {emojiPickerOpen && (
+        <EmojiPickerModal
+          onSelect={(e) => { setEmoji(e); setEmojiPickerOpen(false) }}
+          onClose={() => setEmojiPickerOpen(false)}
+        />
+      )}
+    </>
+  )
 }
