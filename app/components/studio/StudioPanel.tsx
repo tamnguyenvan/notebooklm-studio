@@ -220,7 +220,7 @@ export function StudioPanel({ notebookId }: Props) {
       <div className="flex flex-col overflow-hidden shrink-0" style={{ height: topHeight }}>
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary)' }}>
-            Generate
+            Studio
           </span>
           {loading[notebookId] && <Loader2 size={12} className="animate-spin" style={{ color: 'var(--color-text-tertiary)' }} />}
         </div>
@@ -405,6 +405,7 @@ function ArtifactRow({ meta, artifact, onOpen, onDownload, onCancel, onRename, o
       {/* Label + progress */}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium truncate" title={displayTitle} style={{ color: 'var(--color-text-primary)' }}>{displayTitle}</p>
+        <p className="text-[10px] leading-tight" style={{ color: 'var(--color-text-tertiary)' }}>{meta.label}</p>
         {status === 'generating' && (
           <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-separator)' }}>
             <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'var(--color-accent)', transition: 'width 400ms ease' }} />
