@@ -158,7 +158,6 @@ export function TitleBar({ onSettingsOpen, onToggleSidebar, sidebarOpen, onToggl
             onClick={onToggleStudio}
             className="flex items-center justify-center h-7 w-7 rounded-md transition-colors"
             title={studioOpen ? 'Hide Studio' : 'Show Studio'}
-            style={{ color: studioOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.07)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = studioOpen ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
           >
